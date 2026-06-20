@@ -21,7 +21,7 @@ export default function SchedulePanel({
             </div>
             <label className="flex items-center justify-center w-full border-2 border-dashed border-rose-500/50 hover:border-rose-400 bg-rose-500/5 rounded-lg p-4 cursor-pointer">
               <span className="text-sm font-semibold text-rose-400">{isUploading ? "Processing..." : "AI Image Import"}</span>
-              <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={isUploading} />
+              <input type="file" className="hidden" accept="image/*,application/pdf" onChange={handleImageUpload} disabled={isUploading} />
             </label>
           </div>
         </div>
