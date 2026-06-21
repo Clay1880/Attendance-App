@@ -18,24 +18,30 @@ export async function POST(req) {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-   // Strict prompt enforcing filtering for Batch B and clean JSON output
     const prompt = `
-      You are an expert scheduler. Extract the weekly timetable from this image.
+      You are an expert scheduler. Extract the entire master weekly timetable from this image.
       
-      CRITICAL FILTERING RULES:
-      1. The user is strictly in "Batch B".
-      2. If a time slot has separate listings for different batches (e.g., "DTIL(A)" vs "BEE(B)" or "OOP(B)" vs "OOP(C)"), you MUST ONLY extract the subject corresponding to Batch B. Completely ignore subjects assigned explicitly to Batch A, Batch C, or other batches.
-      3. If a subject is a general lecture meant for the whole class (no batch letter attached, like "OOP", "AS II", "BEE", or "ES & P"), extract it normally.
-      4. Standardize the times to match standard formats like "08:45 AM", "11:00 AM", "01:45 PM", etc.
+      CRITICAL PARSING RULES:
+      1. DO NOT filter for any specific batch or group. Extract ALL subjects for ALL groups (A, B, C, etc.) from the image.
+      2. RETAIN GROUP LETTERS: If a subject is meant for a specific practical batch/group, you MUST include the group letter in parentheses at the end of the subject name (e.g., "DTIL Lab (A)", "BEE Lab (B)", "ES & P Tut (C)").
+      3. REMOVE TEACHER INITIALS: Completely remove any teacher initials enclosed in parentheses. For example, change "OOP (MB)" to just "OOP", and change "AS II (ST)" to just "AS II". ONLY use parentheses for student group letters.
+      4. COMMON LECTURES: If a subject is a general lecture meant for the whole class with no specific group mentioned, extract it normally without any parentheses (e.g., "OOP", "BEE", "AS II").
+      5. CONCURRENT CLASSES: If multiple labs happen at the exact same time for different groups, extract EACH one as a separate object in that day's array, sharing the exact same time string.
+      6. Standardize the times to match 12-hour formats like "08:45 AM", "11:00 AM", "01:45 PM", etc.
       
       Return ONLY a valid JSON object. Do not include markdown formatting or blocks like \`\`\`json.
       The structure MUST exactly match this format:
       {
-        "Monday": [{ "name": "Subject Name", "time": "08:45 AM" }],
+        "Monday": [
+          { "name": "OOP", "time": "08:45 AM" },
+          { "name": "DTIL Lab (A)", "time": "11:00 AM" },
+          { "name": "BEE Lab (B)", "time": "11:00 AM" },
+          { "name": "ES & P Tut (C)", "time": "11:00 AM" }
+        ],
         "Tuesday": [{ "name": "Subject Name", "time": "11:30 AM" }]
       }
       Only include standard weekdays (Monday to Saturday). Ignore Sunday.
-    `;
+`;
 
     const imagePart = {
       inlineData: {
@@ -46,7 +52,7 @@ export async function POST(req) {
 
     const result = await model.generateContent([prompt, imagePart]);
     const responseText = result.response.text();
-    
+
     // Clean up response in case Gemini includes code blocks
     const cleanedText = responseText.replace(/```json\n?|```/g, '').trim();
     const jsonSchedule = JSON.parse(cleanedText);

@@ -20,5 +20,5 @@ export const saveAttendanceData = (uid, date, data) =>
 export const saveGlobalTimetable = (cohortId, data) => 
   setDoc(doc(db, "timetables", cohortId), data);
 
-export const getCohortId = (year, branch, batch, group) => 
-  `${year}-${branch}-${batch}-${group}`;
+export const getTimetableId = (year, branch, batch) => 
+  `${year}-${branch}-${batch}`;
