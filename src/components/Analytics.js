@@ -19,6 +19,11 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
       if (filteredRecords.length === 0) return;
 
       filteredRecords.forEach((record) => {
+        // EXCLUSION FILTER: Completely ignore any Library records in calculations
+        if (record.subject.toUpperCase().includes("LIB")) {
+          return;
+        }
+
         if (record.status !== "Cancelled") {
           totalValid++;
           if (record.status === "Attended") totalAttended++;

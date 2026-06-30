@@ -34,26 +34,26 @@ export default function AttendanceTracker() {
   const [targetBranch, setTargetBranch] = useState("IT");
   const [targetBatch, setTargetBatch] = useState("A");
 
-  const todayDateString = new Date().toISOString().split("T")[0]; 
+  const todayDateString = new Date().toISOString().split("T")[0];
   const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const todayDayName = daysOfWeek[new Date().getDay()];
 
-// --- UPGRADED SMART FILTER LOGIC ---
+  // --- UPGRADED SMART FILTER LOGIC ---
   const filterTimetable = (timetableData, userGroup) => {
     if (!userGroup) return timetableData;
     const filtered = {};
-    
+
     Object.keys(timetableData).forEach((day) => {
       filtered[day] = timetableData[day].filter((cls) => {
         // This specific Regex looks ONLY for A, B, or C inside parentheses OR square brackets.
         // It safely ignores teacher initials like (MB) or (ST) because they aren't A, B, or C.
-        const groupMatch = cls.name.match(/[\[\(]([A-C](?:[, &|/]+[A-C])*)[\]\)]/i); 
-        
+        const groupMatch = cls.name.match(/[\[\(]([A-C](?:[, &|/]+[A-C])*)[\]\)]/i);
+
         if (groupMatch) {
           // If it finds a group indicator like (A) or [B, C], check if the user's group is in it.
           return groupMatch[1].toUpperCase().includes(userGroup.toUpperCase());
         }
-        
+
         // If it finds no (A)/(B)/(C), it's a common lecture meant for all groups!
         return true;
       });
@@ -67,12 +67,12 @@ export default function AttendanceTracker() {
   // Live Timetable Connection
   useEffect(() => {
     if (!userProfile) return;
-    
+
     // We only fetch based on Year-Branch-Batch now!
-    const timetableId = isAdmin 
-      ? getTimetableId(targetYear, targetBranch, targetBatch) 
+    const timetableId = isAdmin
+      ? getTimetableId(targetYear, targetBranch, targetBatch)
       : getTimetableId(userProfile.year, userProfile.branch, userProfile.batch);
-    
+
     const unsubscribe = onSnapshot(doc(db, "timetables", timetableId), (docSnap) => {
       if (docSnap.exists()) setMasterTimetable(docSnap.data());
       else setMasterTimetable({ Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [] });
@@ -89,7 +89,7 @@ export default function AttendanceTracker() {
           setUserProfile(profileSnap.data());
           const data = await fetchAttendanceData(currentUser.uid);
           setAttendance(data);
-        } else setUserProfile(null); 
+        } else setUserProfile(null);
       } else {
         setUserProfile(null);
         setAttendance({});
@@ -100,7 +100,7 @@ export default function AttendanceTracker() {
   }, []);
 
   const handleAuthLogin = async () => {
-    try { await loginUser(); toast.success("Signed in!"); } 
+    try { await loginUser(); toast.success("Signed in!"); }
     catch { toast.error("Failed to sign in."); }
   };
 
@@ -130,7 +130,7 @@ export default function AttendanceTracker() {
       const newTimetable = { ...masterTimetable, ...generated };
       await saveGlobalTimetable(getTimetableId(targetYear, targetBranch, targetBatch), newTimetable);
       toast.success("Import successful!", { id: tId });
-    } catch { toast.error("Error processing image.", { id: tId }); } 
+    } catch { toast.error("Error processing image.", { id: tId }); }
     finally { setIsUploading(false); }
   };
 
@@ -139,8 +139,8 @@ export default function AttendanceTracker() {
     const dayData = attendance[todayDateString] || { month: todayDateString.substring(0, 7), records: [] };
     const rIndex = dayData.records.findIndex(r => r.subject === subjectName);
     const updatedRecords = [...dayData.records];
-    if (rIndex > -1) updatedRecords[rIndex].status = status; 
-    else updatedRecords.push({ subject: subjectName, status }); 
+    if (rIndex > -1) updatedRecords[rIndex].status = status;
+    else updatedRecords.push({ subject: subjectName, status });
 
     const newDayData = { ...dayData, records: updatedRecords };
     setAttendance(prev => ({ ...prev, [todayDateString]: newDayData }));
@@ -148,7 +148,9 @@ export default function AttendanceTracker() {
   };
 
   // Extract subjects from the filtered personal schedule for analytics
-  const availableSubjects = Array.from(new Set(Object.values(personalTimetable).flatMap(d => d.map(s => s.name)))).filter(n => n !== "").sort();
+  const availableSubjects = Array.from(new Set(Object.values(personalTimetable).flatMap(d => d.map(s => s.name))))
+    .filter(n => n !== "" && !n.toUpperCase().includes("LIB"))
+    .sort();
 
   if (loadingAuth) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-indigo-500"></div></div>;
 
@@ -168,14 +170,14 @@ export default function AttendanceTracker() {
       <div className="max-w-md w-full bg-slate-900/40 border border-slate-800 p-8 rounded-3xl">
         <h2 className="text-2xl font-bold text-slate-100 mb-6">Complete Profile</h2>
         <form onSubmit={handleProfileSetup} className="space-y-4">
-           {/* Your existing onboard form inputs */}
-           <div className="grid grid-cols-2 gap-4">
-              <div><label className="block text-xs text-slate-400 mb-1">Year</label><select value={onboardYear} onChange={(e) => setOnboardYear(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-200 outline-none"><option value="FE">FE</option><option value="SE">SE</option><option value="TE">TE</option><option value="BE">BE</option></select></div>
-              <div><label className="block text-xs text-slate-400 mb-1">Branch</label><select value={onboardBranch} onChange={(e) => setOnboardBranch(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-200 outline-none"><option value="CS">CS</option><option value="IT">IT</option><option value="Mechanical">Mechanical</option><option value="ENTC">ENTC</option><option value="ARE">ARE</option></select></div>
-              <div><label className="block text-xs text-slate-400 mb-1">Batch</label><select value={onboardBatch} onChange={(e) => setOnboardBatch(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-200 outline-none"><option value="A">A</option><option value="B">B</option></select></div>
-              <div><label className="block text-xs text-slate-400 mb-1">Group</label><select value={onboardGroup} onChange={(e) => setOnboardGroup(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-200 outline-none"><option value="A">A</option><option value="B">B</option><option value="C">C</option></select></div>
-            </div>
-           <button type="submit" className="w-full mt-4 bg-indigo-600 text-white py-3 rounded-xl font-bold">Launch Dashboard</button>
+          {/* Your existing onboard form inputs */}
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className="block text-xs text-slate-400 mb-1">Year</label><select value={onboardYear} onChange={(e) => setOnboardYear(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-200 outline-none"><option value="FE">FE</option><option value="SE">SE</option><option value="TE">TE</option><option value="BE">BE</option></select></div>
+            <div><label className="block text-xs text-slate-400 mb-1">Branch</label><select value={onboardBranch} onChange={(e) => setOnboardBranch(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-200 outline-none"><option value="CS">CS</option><option value="IT">IT</option><option value="Mechanical">Mechanical</option><option value="ENTC">ENTC</option><option value="ARE">ARE</option></select></div>
+            <div><label className="block text-xs text-slate-400 mb-1">Batch</label><select value={onboardBatch} onChange={(e) => setOnboardBatch(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-200 outline-none"><option value="A">A</option><option value="B">B</option></select></div>
+            <div><label className="block text-xs text-slate-400 mb-1">Group</label><select value={onboardGroup} onChange={(e) => setOnboardGroup(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-200 outline-none"><option value="A">A</option><option value="B">B</option><option value="C">C</option></select></div>
+          </div>
+          <button type="submit" className="w-full mt-4 bg-indigo-600 text-white py-3 rounded-xl font-bold">Launch Dashboard</button>
         </form>
       </div>
     </div>
@@ -185,7 +187,7 @@ export default function AttendanceTracker() {
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 md:p-8 selection:bg-indigo-500 selection:text-white">
       <Toaster position="bottom-right" toastOptions={{ style: { background: '#1e293b', color: '#f8fafc', border: '1px solid #334155' } }} />
       <div className="max-w-4xl mx-auto space-y-8">
-        
+
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-800 pb-6 gap-4">
           <div>
             <div className="flex items-center gap-3">
@@ -207,10 +209,10 @@ export default function AttendanceTracker() {
         {/* Notice we pass the 'personalTimetable' down to the Tracker and Analytics so they only see their classes! */}
         {activeTab === "track" && <DailyTrack timetable={personalTimetable} attendance={attendance} todayDayName={todayDayName} todayDateString={todayDateString} handleMarkAttendance={handleMarkAttendance} userProfile={userProfile} handleUpdateProfile={async (data) => { await saveProfile(user.uid, data); setUserProfile(data); }} />}
         {activeTab === "analytics" && <Analytics attendance={attendance} availableSubjects={availableSubjects} todayDateString={todayDateString} />}
-        
+
         {/* Notice Admin Schedule Panel gets the raw masterTimetable so they can see all groups, but regular students only see their personal one! */}
         {activeTab === "schedule" && <SchedulePanel isAdmin={isAdmin} timetable={isAdmin ? masterTimetable : personalTimetable} currentTargetId={isAdmin ? getTimetableId(targetYear, targetBranch, targetBatch) : getTimetableId(userProfile.year, userProfile.branch, userProfile.batch)} daysOfWeek={daysOfWeek} targetYear={targetYear} setTargetYear={setTargetYear} targetBranch={targetBranch} setTargetBranch={setTargetBranch} targetBatch={targetBatch} setTargetBatch={setTargetBatch} isUploading={isUploading} handleImageUpload={handleImageUpload} handleClearDaySchedule={(d) => saveGlobalTimetable(getTimetableId(targetYear, targetBranch, targetBatch), { ...masterTimetable, [d]: [] })} />}
-        
+
       </div>
     </div>
   );

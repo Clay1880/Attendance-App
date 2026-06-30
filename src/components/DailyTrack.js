@@ -6,8 +6,8 @@ export default function DailyTrack({
   todayDayName, 
   todayDateString, 
   handleMarkAttendance,
-  userProfile,          // NEW PROP
-  handleUpdateProfile   // NEW PROP
+  userProfile,          
+  handleUpdateProfile   
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -22,6 +22,10 @@ export default function DailyTrack({
     setIsEditing(false);
   };
 
+  // Pre-filter today's classes to completely remove any Library (LIB) periods
+  const todaysClassesRaw = timetable[todayDayName] || [];
+  const todaysClasses = todaysClassesRaw.filter(subject => !subject.name.toUpperCase().includes("LIB"));
+
   return (
     <section className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fadeIn">
       
@@ -30,9 +34,9 @@ export default function DailyTrack({
         <h2 className="text-xl font-bold mb-2 text-slate-200">Today's Lectures</h2>
         <p className="text-sm text-slate-400 mb-6">Mark classes scheduled for today.</p>
         
-        {timetable[todayDayName] && timetable[todayDayName].length > 0 ? (
+        {todaysClasses.length > 0 ? (
           <div className="grid gap-4">
-            {timetable[todayDayName].map((subject, idx) => {
+            {todaysClasses.map((subject, idx) => {
               const currentStatus = attendance[todayDateString]?.records.find(r => r.subject === subject.name)?.status;
               return (
                 <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-slate-900/60 border border-slate-800 rounded-xl gap-4 hover:border-slate-700">
