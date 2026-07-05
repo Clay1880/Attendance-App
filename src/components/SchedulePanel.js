@@ -1,10 +1,10 @@
 import React from "react";
 
-export default function SchedulePanel({ 
+export default function SchedulePanel({
   isAdmin, timetable, currentTargetId, daysOfWeek,
-  targetYear, setTargetYear, targetBranch, setTargetBranch, 
+  targetYear, setTargetYear, targetBranch, setTargetBranch,
   targetBatch, setTargetBatch,
-  isUploading, handleImageUpload, handleClearDaySchedule 
+  isUploading, handleImageUpload, handleClearDaySchedule
 }) {
   return (
     <section className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fadeIn">
@@ -13,8 +13,7 @@ export default function SchedulePanel({
           <div className="bg-slate-900/40 border border-rose-500/30 p-6 rounded-2xl relative">
             <div className="absolute top-0 right-0 bg-rose-600 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg">ADMIN UPLOAD</div>
             <h3 className="text-lg font-bold text-slate-200 mb-4">Deploy Global Schedule</h3>
-            
-            {/* UPDATED: Group dropdown removed. Admin targets Master Batch only */}
+
             <div className="grid grid-cols-3 gap-2 mb-4">
               <select value={targetYear} onChange={(e) => setTargetYear(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200"><option value="FE">FE</option><option value="SE">SE</option><option value="TE">TE</option><option value="BE">BE</option></select>
               <select value={targetBranch} onChange={(e) => setTargetBranch(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200"><option value="CS">CS</option><option value="IT">IT</option><option value="Mechanical">Mechanical</option><option value="ENTC">ENTC</option><option value="ARE">ARE</option></select>
@@ -33,6 +32,7 @@ export default function SchedulePanel({
           <h3 className="text-lg font-bold text-slate-200">{isAdmin ? `Viewing Master: ${currentTargetId}` : "Your Official Timetable"}</h3>
           <p className="text-sm text-slate-400">{isAdmin ? "You are viewing the unfiltered master schedule for this batch." : "This schedule is automatically filtered for your specific group."}</p>
         </div>
+        
         <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
           {daysOfWeek.filter(d => d !== "Sunday").map(day => (
             <div key={day} className="border-b border-slate-800 pb-3">
@@ -40,11 +40,28 @@ export default function SchedulePanel({
                 <h4 className="font-bold text-indigo-400 text-sm">{day}</h4>
                 {isAdmin && timetable[day]?.length > 0 && <button onClick={() => handleClearDaySchedule(day)} className="text-xs text-rose-400 hover:underline">Clear</button>}
               </div>
+              
+              {/* CLEANED UP TERNARY CHECK */}
               {timetable[day]?.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {timetable[day].map((sub, i) => <span key={i} className="bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg text-xs"><span className="text-slate-300 font-medium">{sub.name}</span> <span className="text-slate-500 font-mono text-[10px] ml-2">{sub.time}</span></span>)}
+                <div className="flex flex-wrap gap-3 mt-1">
+                  {timetable[day].map((subject, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 bg-slate-900/60 border border-slate-700/50 px-3 py-1.5 rounded-xl hover:border-indigo-500/50 transition-colors"
+                    >
+                      <span className="text-sm font-semibold text-slate-200">
+                        {subject.name}
+                      </span>
+                      <span className="text-[10px] font-mono text-indigo-400 bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800">
+                        {subject.startTime || subject.time} {subject.endTime ? `- ${subject.endTime}` : ""}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ) : (<span className="text-xs text-slate-600">No classes.</span>)}
+              ) : (
+                <div className="text-sm text-slate-600 italic mt-1">No classes.</div>
+              )}
+              
             </div>
           ))}
         </div>

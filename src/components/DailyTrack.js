@@ -37,17 +37,23 @@ export default function DailyTrack({
         {todaysClasses.length > 0 ? (
           <div className="grid gap-4">
             {todaysClasses.map((subject, idx) => {
-              const currentStatus = attendance[todayDateString]?.records.find(r => r.subject === subject.name)?.status;
+              // Extract short code just in case old data exists
+              const subjectCode = subject.name.split(" ")[0]; 
+              const currentStatus = attendance[todayDateString]?.records.find(r => r.subject === subjectCode)?.status;
+              
               return (
                 <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-slate-900/60 border border-slate-800 rounded-xl gap-4 hover:border-slate-700">
                   <div>
-                    <h3 className="font-semibold text-slate-200 text-lg">{subject.name}</h3>
-                    <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-400 inline-block mt-1">{subject.time}</span>
+                    <h3 className="font-semibold text-slate-200 text-lg">{subjectCode}</h3>
+                    {/* DISPLAY BOTH START AND END TIME */}
+                    <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-400 inline-block mt-1">
+                      {subject.startTime || subject.time} {subject.endTime ? `→ ${subject.endTime}` : ""}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <button onClick={() => handleMarkAttendance(subject.name, "Attended")} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${currentStatus === "Attended" ? "bg-emerald-500/20 border-emerald-500 text-emerald-400" : "bg-slate-900 border-slate-800 text-slate-400"}`}>Attended</button>
-                    <button onClick={() => handleMarkAttendance(subject.name, "Missed")} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${currentStatus === "Missed" ? "bg-rose-500/20 border-rose-500 text-rose-400" : "bg-slate-900 border-slate-800 text-slate-400"}`}>Missed</button>
-                    <button onClick={() => handleMarkAttendance(subject.name, "Cancelled")} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${currentStatus === "Cancelled" ? "bg-amber-500/20 border-amber-500 text-amber-400" : "bg-slate-900 border-slate-800 text-slate-400"}`}>N/A</button>
+                    <button onClick={() => handleMarkAttendance(subjectCode, "Attended")} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${currentStatus === "Attended" ? "bg-emerald-500/20 border-emerald-500 text-emerald-400" : "bg-slate-900 border-slate-800 text-slate-400"}`}>Attended</button>
+                    <button onClick={() => handleMarkAttendance(subjectCode, "Missed")} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${currentStatus === "Missed" ? "bg-rose-500/20 border-rose-500 text-rose-400" : "bg-slate-900 border-slate-800 text-slate-400"}`}>Missed</button>
+                    <button onClick={() => handleMarkAttendance(subjectCode, "Cancelled")} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${currentStatus === "Cancelled" ? "bg-amber-500/20 border-amber-500 text-amber-400" : "bg-slate-900 border-slate-800 text-slate-400"}`}>N/A</button>
                   </div>
                 </div>
               );

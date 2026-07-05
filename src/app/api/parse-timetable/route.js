@@ -23,25 +23,26 @@ export async function POST(req) {
       
       CRITICAL PARSING RULES:
       1. DO NOT filter for any specific batch or group. Extract ALL subjects for ALL groups (A, B, C, etc.) from the image.
-      2. RETAIN GROUP LETTERS: If a subject is meant for a specific practical batch/group, you MUST include the group letter in parentheses at the end of the subject name (e.g., "DTIL Lab (A)", "BEE Lab (B)", "ES & P Tut (C)").
-      3. REMOVE TEACHER INITIALS: Completely remove any teacher initials enclosed in parentheses. For example, change "OOP (MB)" to just "OOP", and change "AS II (ST)" to just "AS II". ONLY use parentheses for student group letters.
-      4. COMMON LECTURES: If a subject is a general lecture meant for the whole class with no specific group mentioned, extract it normally without any parentheses (e.g., "OOP", "BEE", "AS II").
-      5. CONCURRENT CLASSES: If multiple labs happen at the exact same time for different groups, extract EACH one as a separate object in that day's array, sharing the exact same time string.
-      6. Standardize the times to match 12-hour formats like "08:45 AM", "11:00 AM", "01:45 PM", etc.
+      2. SHORT CODES ONLY: You MUST extract ONLY the short, abbreviated subject code (e.g., "DSA", "CG", "LDCO", "DSAL"). Completely IGNORE and REMOVE any long descriptive syllabus text, topics, or full names.
+      3. RETAIN GROUP LETTERS: If a subject is meant for a specific practical batch/group, include the group letter in parentheses at the end of the short subject code (e.g., "DSAL (A)", "CGL (B)").
+      4. REMOVE TEACHER INITIALS: Completely remove any teacher initials enclosed in parentheses.
+      5. EXTRACT BOTH START & END TIMES (CRITICAL): Carefully look at the timetable grid or headers to find both the start time and the end time for every single lecture/lab slot.
+      6. Standardize all times to a 12-hour AM/PM format (e.g., "08:45 AM", "11:00 AM", "01:45 PM").
+      7. IGNORE BLANK CELLS: If a time slot or cell in the grid is physically empty/blank, DO NOT guess, DO NOT assume it is "LIB", and DO NOT add it. Simply skip that time slot entirely.
+      8. STRICT ROW ALIGNMENT (CRITICAL): Read the grid strictly row by row, horizontally. Do NOT let subjects bleed from one day into another. Pay close attention to horizontal grid lines.
+      9. HOLIDAYS: If a row explicitly says "HOLIDAY" (like Thursday), the array for that specific day MUST be completely empty. Do not accidentally pull classes from the day above or below it.
       
       Return ONLY a valid JSON object. Do not include markdown formatting or blocks like \`\`\`json.
       The structure MUST exactly match this format:
       {
         "Monday": [
-          { "name": "OOP", "time": "08:45 AM" },
-          { "name": "DTIL Lab (A)", "time": "11:00 AM" },
-          { "name": "BEE Lab (B)", "time": "11:00 AM" },
-          { "name": "ES & P Tut (C)", "time": "11:00 AM" }
+          { "name": "DSA", "startTime": "08:45 AM", "endTime": "09:45 AM" },
+          { "name": "Counseling", "startTime": "03:45 PM", "endTime": "04:45 PM" }
         ],
-        "Tuesday": [{ "name": "Subject Name", "time": "11:30 AM" }]
+        "Thursday": []
       }
       Only include standard weekdays (Monday to Saturday). Ignore Sunday.
-`;
+`; 
 
     const imagePart = {
       inlineData: {

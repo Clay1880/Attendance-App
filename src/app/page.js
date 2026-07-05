@@ -6,7 +6,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { db, auth } from "../firebase";
 import toast, { Toaster } from "react-hot-toast";
 
-// Import API tools (Notice getTimetableId replaces getCohortId)
+// Import API tools
 import { loginUser, logoutUser, saveProfile, fetchAttendanceData, saveAttendanceData, saveGlobalTimetable, getTimetableId } from "../services/api";
 import DailyTrack from "../components/DailyTrack";
 import Analytics from "../components/Analytics";
@@ -17,8 +17,29 @@ export default function AttendanceTracker() {
   const [userProfile, setUserProfile] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
 
-  const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-  const isAdmin = userProfile?.email?.toLowerCase() === ADMIN_EMAIL?.toLowerCase();
+  const ADMIN_ROLES = {};
+
+  // 1. Superadmin (You)
+  const superAdmin = process.env.NEXT_PUBLIC_SUPERADMIN_EMAIL?.toLowerCase();
+  if (superAdmin) ADMIN_ROLES[superAdmin] = { role: "superadmin" };
+
+  // 2. Co-Admins (Your 4 friends)
+  const coAdminENTC = process.env.NEXT_PUBLIC_COADMIN_ENTC?.toLowerCase();
+  if (coAdminENTC) ADMIN_ROLES[coAdminENTC] = { role: "coadmin", allowedYear: "SE", allowedBranch: "ENTC" };
+
+  const coAdminCS = process.env.NEXT_PUBLIC_COADMIN_CS?.toLowerCase();
+  if (coAdminCS) ADMIN_ROLES[coAdminCS] = { role: "coadmin", allowedYear: "SE", allowedBranch: "CS" };
+
+  const coAdminMECH = process.env.NEXT_PUBLIC_COADMIN_MECH?.toLowerCase();
+  if (coAdminMECH) ADMIN_ROLES[coAdminMECH] = { role: "coadmin", allowedYear: "SE", allowedBranch: "Mechanical" };
+
+  const coAdminIT = process.env.NEXT_PUBLIC_COADMIN_IT?.toLowerCase();
+  if (coAdminIT) ADMIN_ROLES[coAdminIT] = { role: "coadmin", allowedYear: "SE", allowedBranch: "IT" }; // Changed ARE to IT assuming standard branches
+
+  // --- Validate the current user ---
+  const currentUserEmail = userProfile?.email?.toLowerCase();
+  const adminConfig = currentUserEmail ? ADMIN_ROLES[currentUserEmail] : null;
+  const isAdmin = !!adminConfig; 
 
   const [onboardYear, setOnboardYear] = useState("FE");
   const [onboardBranch, setOnboardBranch] = useState("CS");
@@ -29,7 +50,6 @@ export default function AttendanceTracker() {
   const [masterTimetable, setMasterTimetable] = useState({ Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [] });
   const [attendance, setAttendance] = useState({});
 
-  // Admin Targeting (Notice Group is removed here)
   const [targetYear, setTargetYear] = useState("SE");
   const [targetBranch, setTargetBranch] = useState("IT");
   const [targetBatch, setTargetBatch] = useState("A");
@@ -38,6 +58,14 @@ export default function AttendanceTracker() {
   const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const todayDayName = daysOfWeek[new Date().getDay()];
 
+  // Auto-set the target branch if the user is a restricted co-admin
+  useEffect(() => {
+    if (adminConfig && adminConfig.role === "coadmin") {
+      setTargetYear(adminConfig.allowedYear);
+      setTargetBranch(adminConfig.allowedBranch);
+    }
+  }, [adminConfig]);
+
   // --- UPGRADED SMART FILTER LOGIC ---
   const filterTimetable = (timetableData, userGroup) => {
     if (!userGroup) return timetableData;
@@ -45,30 +73,22 @@ export default function AttendanceTracker() {
 
     Object.keys(timetableData).forEach((day) => {
       filtered[day] = timetableData[day].filter((cls) => {
-        // This specific Regex looks ONLY for A, B, or C inside parentheses OR square brackets.
-        // It safely ignores teacher initials like (MB) or (ST) because they aren't A, B, or C.
         const groupMatch = cls.name.match(/[\[\(]([A-C](?:[, &|/]+[A-C])*)[\]\)]/i);
-
         if (groupMatch) {
-          // If it finds a group indicator like (A) or [B, C], check if the user's group is in it.
           return groupMatch[1].toUpperCase().includes(userGroup.toUpperCase());
         }
-
-        // If it finds no (A)/(B)/(C), it's a common lecture meant for all groups!
         return true;
       });
     });
     return filtered;
   };
 
-  // Generate the student's personal timetable by passing the Master through the filter
   const personalTimetable = filterTimetable(masterTimetable, userProfile?.group);
 
   // Live Timetable Connection
   useEffect(() => {
     if (!userProfile) return;
 
-    // We only fetch based on Year-Branch-Batch now!
     const timetableId = isAdmin
       ? getTimetableId(targetYear, targetBranch, targetBatch)
       : getTimetableId(userProfile.year, userProfile.branch, userProfile.batch);
@@ -147,7 +167,6 @@ export default function AttendanceTracker() {
     await saveAttendanceData(user.uid, todayDateString, newDayData);
   };
 
-  // Extract subjects from the filtered personal schedule for analytics
   const availableSubjects = Array.from(new Set(Object.values(personalTimetable).flatMap(d => d.map(s => s.name))))
     .filter(n => n !== "" && !n.toUpperCase().includes("LIB"))
     .sort();
@@ -170,7 +189,6 @@ export default function AttendanceTracker() {
       <div className="max-w-md w-full bg-slate-900/40 border border-slate-800 p-8 rounded-3xl">
         <h2 className="text-2xl font-bold text-slate-100 mb-6">Complete Profile</h2>
         <form onSubmit={handleProfileSetup} className="space-y-4">
-          {/* Your existing onboard form inputs */}
           <div className="grid grid-cols-2 gap-4">
             <div><label className="block text-xs text-slate-400 mb-1">Year</label><select value={onboardYear} onChange={(e) => setOnboardYear(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-200 outline-none"><option value="FE">FE</option><option value="SE">SE</option><option value="TE">TE</option><option value="BE">BE</option></select></div>
             <div><label className="block text-xs text-slate-400 mb-1">Branch</label><select value={onboardBranch} onChange={(e) => setOnboardBranch(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-slate-200 outline-none"><option value="CS">CS</option><option value="IT">IT</option><option value="Mechanical">Mechanical</option><option value="ENTC">ENTC</option><option value="ARE">ARE</option></select></div>
@@ -206,12 +224,28 @@ export default function AttendanceTracker() {
           </div>
         </header>
 
-        {/* Notice we pass the 'personalTimetable' down to the Tracker and Analytics so they only see their classes! */}
         {activeTab === "track" && <DailyTrack timetable={personalTimetable} attendance={attendance} todayDayName={todayDayName} todayDateString={todayDateString} handleMarkAttendance={handleMarkAttendance} userProfile={userProfile} handleUpdateProfile={async (data) => { await saveProfile(user.uid, data); setUserProfile(data); }} />}
         {activeTab === "analytics" && <Analytics attendance={attendance} availableSubjects={availableSubjects} todayDateString={todayDateString} />}
 
-        {/* Notice Admin Schedule Panel gets the raw masterTimetable so they can see all groups, but regular students only see their personal one! */}
-        {activeTab === "schedule" && <SchedulePanel isAdmin={isAdmin} timetable={isAdmin ? masterTimetable : personalTimetable} currentTargetId={isAdmin ? getTimetableId(targetYear, targetBranch, targetBatch) : getTimetableId(userProfile.year, userProfile.branch, userProfile.batch)} daysOfWeek={daysOfWeek} targetYear={targetYear} setTargetYear={setTargetYear} targetBranch={targetBranch} setTargetBranch={setTargetBranch} targetBatch={targetBatch} setTargetBatch={setTargetBatch} isUploading={isUploading} handleImageUpload={handleImageUpload} handleClearDaySchedule={(d) => saveGlobalTimetable(getTimetableId(targetYear, targetBranch, targetBatch), { ...masterTimetable, [d]: [] })} />}
+        {/* The fix is right here: adding adminConfig={adminConfig} so the Panel knows who is logged in! */}
+        {activeTab === "schedule" && (
+          <SchedulePanel 
+            isAdmin={isAdmin} 
+            adminConfig={adminConfig}
+            timetable={isAdmin ? masterTimetable : personalTimetable} 
+            currentTargetId={isAdmin ? getTimetableId(targetYear, targetBranch, targetBatch) : getTimetableId(userProfile.year, userProfile.branch, userProfile.batch)} 
+            daysOfWeek={daysOfWeek} 
+            targetYear={targetYear} 
+            setTargetYear={setTargetYear} 
+            targetBranch={targetBranch} 
+            setTargetBranch={setTargetBranch} 
+            targetBatch={targetBatch} 
+            setTargetBatch={setTargetBatch} 
+            isUploading={isUploading} 
+            handleImageUpload={handleImageUpload} 
+            handleClearDaySchedule={(d) => saveGlobalTimetable(getTimetableId(targetYear, targetBranch, targetBatch), { ...masterTimetable, [d]: [] })} 
+          />
+        )}
 
       </div>
     </div>
