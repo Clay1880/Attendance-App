@@ -22,3 +22,17 @@ export const saveGlobalTimetable = (cohortId, data) =>
 
 export const getTimetableId = (year, branch, batch) => 
   `${year}-${branch}-${batch}`;
+
+export const fetchAllSystemUsers = async () => {
+  try {
+    const usersSnapshot = await getDocs(collection(db, "users"));
+    const usersList = [];
+    usersSnapshot.forEach((doc) => {
+      usersList.push({ uid: doc.id, ...doc.data() });
+    });
+    return usersList;
+  } catch (error) {
+    console.error("Error fetching all users:", error);
+    return [];
+  }
+};

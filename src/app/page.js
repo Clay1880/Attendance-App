@@ -11,6 +11,7 @@ import { loginUser, logoutUser, saveProfile, fetchAttendanceData, saveAttendance
 import DailyTrack from "../components/DailyTrack";
 import Analytics from "../components/Analytics";
 import SchedulePanel from "../components/SchedulePanel";
+import SuperadminPanel from "../components/SuperadminPanel";
 
 export default function AttendanceTracker() {
   const [user, setUser] = useState(null);
@@ -19,11 +20,16 @@ export default function AttendanceTracker() {
 
   const ADMIN_ROLES = {};
 
-  // 1. Superadmin (You)
-  const superAdmin = process.env.NEXT_PUBLIC_SUPERADMIN_EMAIL?.toLowerCase();
-  if (superAdmin) ADMIN_ROLES[superAdmin] = { role: "superadmin" };
+  // 1. Superadmins (You and anyone else you add)
+  const superAdminsRaw = process.env.NEXT_PUBLIC_SUPERADMIN_EMAILS || "";
+  superAdminsRaw.split(",").forEach(email => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (cleanEmail) {
+      ADMIN_ROLES[cleanEmail] = { role: "superadmin" };
+    }
+  });
 
-  // 2. Co-Admins (Your 4 friends)
+  // 2. Co-Admins (Your friends)
   const coAdminENTC = process.env.NEXT_PUBLIC_COADMIN_ENTC?.toLowerCase();
   if (coAdminENTC) ADMIN_ROLES[coAdminENTC] = { role: "coadmin", allowedYear: "SE", allowedBranch: "ENTC" };
 
@@ -34,12 +40,13 @@ export default function AttendanceTracker() {
   if (coAdminMECH) ADMIN_ROLES[coAdminMECH] = { role: "coadmin", allowedYear: "SE", allowedBranch: "Mechanical" };
 
   const coAdminIT = process.env.NEXT_PUBLIC_COADMIN_IT?.toLowerCase();
-  if (coAdminIT) ADMIN_ROLES[coAdminIT] = { role: "coadmin", allowedYear: "SE", allowedBranch: "IT" }; // Changed ARE to IT assuming standard branches
+  if (coAdminIT) ADMIN_ROLES[coAdminIT] = { role: "coadmin", allowedYear: "SE", allowedBranch: "IT" }; 
 
   // --- Validate the current user ---
   const currentUserEmail = userProfile?.email?.toLowerCase();
   const adminConfig = currentUserEmail ? ADMIN_ROLES[currentUserEmail] : null;
-  const isAdmin = !!adminConfig; 
+  const isAdmin = !!adminConfig;
+  const isSuperAdmin = adminConfig?.role === "superadmin"; // <-- NEW CHECK ADDED
 
   const [onboardYear, setOnboardYear] = useState("FE");
   const [onboardBranch, setOnboardBranch] = useState("CS");
@@ -220,31 +227,43 @@ export default function AttendanceTracker() {
               <button onClick={() => setActiveTab("track")} className={`px-4 py-2 text-sm rounded-lg ${activeTab === "track" ? "bg-indigo-600 text-white" : "text-slate-400"}`}>Daily Track</button>
               <button onClick={() => setActiveTab("analytics")} className={`px-4 py-2 text-sm rounded-lg ${activeTab === "analytics" ? "bg-indigo-600 text-white" : "text-slate-400"}`}>Analytics</button>
               <button onClick={() => setActiveTab("schedule")} className={`px-4 py-2 text-sm rounded-lg ${activeTab === "schedule" ? "bg-indigo-600 text-white" : "text-slate-400"}`}>{isAdmin ? "Admin Controls" : "My Schedule"}</button>
+              
+              {/* NEW: Secret Tab that only renders for Superadmins */}
+              {isSuperAdmin && (
+                <button onClick={() => setActiveTab("database")} className={`px-4 py-2 text-sm font-bold rounded-lg ${activeTab === "database" ? "bg-rose-600 text-white" : "text-rose-400/70 hover:text-rose-400 transition-colors"}`}>
+                  System DB
+                </button>
+              )}
             </nav>
           </div>
         </header>
 
         {activeTab === "track" && <DailyTrack timetable={personalTimetable} attendance={attendance} todayDayName={todayDayName} todayDateString={todayDateString} handleMarkAttendance={handleMarkAttendance} userProfile={userProfile} handleUpdateProfile={async (data) => { await saveProfile(user.uid, data); setUserProfile(data); }} />}
+        
         {activeTab === "analytics" && <Analytics attendance={attendance} availableSubjects={availableSubjects} todayDateString={todayDateString} />}
 
-        {/* The fix is right here: adding adminConfig={adminConfig} so the Panel knows who is logged in! */}
         {activeTab === "schedule" && (
-          <SchedulePanel 
-            isAdmin={isAdmin} 
+          <SchedulePanel
+            isAdmin={isAdmin}
             adminConfig={adminConfig}
-            timetable={isAdmin ? masterTimetable : personalTimetable} 
-            currentTargetId={isAdmin ? getTimetableId(targetYear, targetBranch, targetBatch) : getTimetableId(userProfile.year, userProfile.branch, userProfile.batch)} 
-            daysOfWeek={daysOfWeek} 
-            targetYear={targetYear} 
-            setTargetYear={setTargetYear} 
-            targetBranch={targetBranch} 
-            setTargetBranch={setTargetBranch} 
-            targetBatch={targetBatch} 
-            setTargetBatch={setTargetBatch} 
-            isUploading={isUploading} 
-            handleImageUpload={handleImageUpload} 
-            handleClearDaySchedule={(d) => saveGlobalTimetable(getTimetableId(targetYear, targetBranch, targetBatch), { ...masterTimetable, [d]: [] })} 
+            timetable={isAdmin ? masterTimetable : personalTimetable}
+            currentTargetId={isAdmin ? getTimetableId(targetYear, targetBranch, targetBatch) : getTimetableId(userProfile.year, userProfile.branch, userProfile.batch)}
+            daysOfWeek={daysOfWeek}
+            targetYear={targetYear}
+            setTargetYear={setTargetYear}
+            targetBranch={targetBranch}
+            setTargetBranch={setTargetBranch}
+            targetBatch={targetBatch}
+            setTargetBatch={setTargetBatch}
+            isUploading={isUploading}
+            handleImageUpload={handleImageUpload}
+            handleClearDaySchedule={(d) => saveGlobalTimetable(getTimetableId(targetYear, targetBranch, targetBatch), { ...masterTimetable, [d]: [] })}
           />
+        )}
+
+        {/* NEW: System Database component rendered for superadmins */}
+        {activeTab === "database" && isSuperAdmin && (
+          <SuperadminPanel />
         )}
 
       </div>
