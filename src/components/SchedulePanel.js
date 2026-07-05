@@ -1,11 +1,17 @@
 import React from "react";
 
 export default function SchedulePanel({
-  isAdmin, timetable, currentTargetId, daysOfWeek,
+  isAdmin, timetable, currentTargetId, daysOfWeek, adminConfig,
   targetYear, setTargetYear, targetBranch, setTargetBranch,
   targetBatch, setTargetBatch,
   isUploading, handleImageUpload, handleClearDaySchedule
 }) {
+  
+  // Extract role capabilities from the config
+  const isSuperAdmin = adminConfig?.role === "superadmin";
+  const isCoAdmin = adminConfig?.role === "coadmin";
+  const allowedBranch = adminConfig?.allowedBranch;
+
   return (
     <section className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fadeIn">
       {isAdmin && (
@@ -15,10 +21,51 @@ export default function SchedulePanel({
             <h3 className="text-lg font-bold text-slate-200 mb-4">Deploy Global Schedule</h3>
 
             <div className="grid grid-cols-3 gap-2 mb-4">
-              <select value={targetYear} onChange={(e) => setTargetYear(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200"><option value="FE">FE</option><option value="SE">SE</option><option value="TE">TE</option><option value="BE">BE</option></select>
-              <select value={targetBranch} onChange={(e) => setTargetBranch(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200"><option value="CS">CS</option><option value="IT">IT</option><option value="Mechanical">Mechanical</option><option value="ENTC">ENTC</option><option value="ARE">ARE</option></select>
-              <select value={targetBatch} onChange={(e) => setTargetBatch(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200"><option value="A">Batch A</option><option value="B">Batch B</option></select>
+              {/* YEAR DROPDOWN: Open for EVERYONE */}
+              <select 
+                value={targetYear} 
+                onChange={(e) => setTargetYear(e.target.value)} 
+                className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 cursor-pointer"
+              >
+                <option value="FE">FE</option>
+                <option value="SE">SE</option>
+                <option value="TE">TE</option>
+                <option value="BE">BE</option>
+              </select>
+
+              {/* BRANCH DROPDOWN: Locked to a single option for Co-Admins */}
+              <select 
+                value={targetBranch} 
+                onChange={(e) => setTargetBranch(e.target.value)} 
+                disabled={isCoAdmin}
+                className={`bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 ${isCoAdmin ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+              >
+                {isCoAdmin ? (
+                  /* Co-Admins ONLY see their assigned branch */
+                  <option value={allowedBranch}>{allowedBranch}</option>
+                ) : (
+                  /* Superadmins see all branches */
+                  <>
+                    <option value="CS">CS</option>
+                    <option value="IT">IT</option>
+                    <option value="Mechanical">Mechanical</option>
+                    <option value="ENTC">ENTC</option>
+                    <option value="ARE">ARE</option>
+                  </>
+                )}
+              </select>
+
+              {/* BATCH DROPDOWN: Open for EVERYONE */}
+              <select 
+                value={targetBatch} 
+                onChange={(e) => setTargetBatch(e.target.value)} 
+                className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 cursor-pointer"
+              >
+                <option value="A">Batch A</option>
+                <option value="B">Batch B</option>
+              </select>
             </div>
+            
             <label className="flex items-center justify-center w-full border-2 border-dashed border-rose-500/50 hover:border-rose-400 bg-rose-500/5 rounded-lg p-4 cursor-pointer">
               <span className="text-sm font-semibold text-rose-400">{isUploading ? "Processing..." : "AI Image Import"}</span>
               <input type="file" className="hidden" accept="image/*,application/pdf" onChange={handleImageUpload} disabled={isUploading} />
@@ -41,7 +88,6 @@ export default function SchedulePanel({
                 {isAdmin && timetable[day]?.length > 0 && <button onClick={() => handleClearDaySchedule(day)} className="text-xs text-rose-400 hover:underline">Clear</button>}
               </div>
               
-              {/* CLEANED UP TERNARY CHECK */}
               {timetable[day]?.length > 0 ? (
                 <div className="flex flex-wrap gap-3 mt-1">
                   {timetable[day].map((subject, idx) => (

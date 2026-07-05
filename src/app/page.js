@@ -29,24 +29,21 @@ export default function AttendanceTracker() {
     }
   });
 
-  // 2. Co-Admins (Your friends)
+  // 2. Co-Admins (Your friends) - REMOVED allowedYear SO THEY CAN ACCESS ALL YEARS
   const coAdminENTC = process.env.NEXT_PUBLIC_COADMIN_ENTC?.toLowerCase();
-  if (coAdminENTC) ADMIN_ROLES[coAdminENTC] = { role: "coadmin", allowedYear: "SE", allowedBranch: "ENTC" };
+  if (coAdminENTC) ADMIN_ROLES[coAdminENTC] = { role: "coadmin", allowedBranch: "ENTC" };
 
   const coAdminCS = process.env.NEXT_PUBLIC_COADMIN_CS?.toLowerCase();
-  if (coAdminCS) ADMIN_ROLES[coAdminCS] = { role: "coadmin", allowedYear: "SE", allowedBranch: "CS" };
+  if (coAdminCS) ADMIN_ROLES[coAdminCS] = { role: "coadmin", allowedBranch: "CS" };
 
-  const coAdminMECH = process.env.NEXT_PUBLIC_COADMIN_MECH?.toLowerCase();
-  if (coAdminMECH) ADMIN_ROLES[coAdminMECH] = { role: "coadmin", allowedYear: "SE", allowedBranch: "Mechanical" };
-
-  const coAdminIT = process.env.NEXT_PUBLIC_COADMIN_IT?.toLowerCase();
-  if (coAdminIT) ADMIN_ROLES[coAdminIT] = { role: "coadmin", allowedYear: "SE", allowedBranch: "IT" }; 
+  const coAdminARE = process.env.NEXT_PUBLIC_COADMIN_ARE?.toLowerCase();
+  if (coAdminARE) ADMIN_ROLES[coAdminARE] = { role: "coadmin", allowedBranch: "ARE" }; 
 
   // --- Validate the current user ---
   const currentUserEmail = userProfile?.email?.toLowerCase();
   const adminConfig = currentUserEmail ? ADMIN_ROLES[currentUserEmail] : null;
   const isAdmin = !!adminConfig;
-  const isSuperAdmin = adminConfig?.role === "superadmin"; // <-- NEW CHECK ADDED
+  const isSuperAdmin = adminConfig?.role === "superadmin";
 
   const [onboardYear, setOnboardYear] = useState("FE");
   const [onboardBranch, setOnboardBranch] = useState("CS");
@@ -68,7 +65,7 @@ export default function AttendanceTracker() {
   // Auto-set the target branch if the user is a restricted co-admin
   useEffect(() => {
     if (adminConfig && adminConfig.role === "coadmin") {
-      setTargetYear(adminConfig.allowedYear);
+      // ONLY set the branch, leave the year alone so they can select it!
       setTargetBranch(adminConfig.allowedBranch);
     }
   }, [adminConfig]);
