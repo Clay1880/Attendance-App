@@ -37,7 +37,7 @@ export default function AttendanceTracker() {
   if (coAdminCS) ADMIN_ROLES[coAdminCS] = { role: "coadmin", allowedBranch: "CS" };
 
   const coAdminARE = process.env.NEXT_PUBLIC_COADMIN_ARE?.toLowerCase();
-  if (coAdminARE) ADMIN_ROLES[coAdminARE] = { role: "coadmin", allowedBranch: "ARE" }; 
+  if (coAdminARE) ADMIN_ROLES[coAdminARE] = { role: "coadmin", allowedBranch: "ARE" };
 
   // --- Validate the current user ---
   const currentUserEmail = userProfile?.email?.toLowerCase();
@@ -171,6 +171,28 @@ export default function AttendanceTracker() {
     await saveAttendanceData(user.uid, todayDateString, newDayData);
   };
 
+  const handleManualAdjustment = async (subject, type, operation) => {
+    if (!user || !userProfile) return;
+
+    const currentAdjustments = userProfile.manualAdjustments || {};
+    const subjectAdj = currentAdjustments[subject] || { present: 0, absent: 0 };
+
+    // ALLOW NEGATIVES: We removed the zero-limit so users can subtract auto-tracked mistakes!
+    let newCount = subjectAdj[type] + (operation === 'add' ? 1 : -1);
+
+    const updatedProfile = {
+      ...userProfile,
+      manualAdjustments: {
+        ...currentAdjustments,
+        [subject]: { ...subjectAdj, [type]: newCount }
+      }
+    };
+
+    setUserProfile(updatedProfile);
+    await saveProfile(user.uid, updatedProfile);
+    toast.success(`${subject} manually updated!`);
+  };
+
   const availableSubjects = Array.from(new Set(Object.values(personalTimetable).flatMap(d => d.map(s => s.name))))
     .filter(n => n !== "" && !n.toUpperCase().includes("LIB"))
     .sort();
@@ -224,7 +246,7 @@ export default function AttendanceTracker() {
               <button onClick={() => setActiveTab("track")} className={`px-4 py-2 text-sm rounded-lg ${activeTab === "track" ? "bg-indigo-600 text-white" : "text-slate-400"}`}>Daily Track</button>
               <button onClick={() => setActiveTab("analytics")} className={`px-4 py-2 text-sm rounded-lg ${activeTab === "analytics" ? "bg-indigo-600 text-white" : "text-slate-400"}`}>Analytics</button>
               <button onClick={() => setActiveTab("schedule")} className={`px-4 py-2 text-sm rounded-lg ${activeTab === "schedule" ? "bg-indigo-600 text-white" : "text-slate-400"}`}>{isAdmin ? "Admin Controls" : "My Schedule"}</button>
-              
+
               {/* NEW: Secret Tab that only renders for Superadmins */}
               {isSuperAdmin && (
                 <button onClick={() => setActiveTab("database")} className={`px-4 py-2 text-sm font-bold rounded-lg ${activeTab === "database" ? "bg-rose-600 text-white" : "text-rose-400/70 hover:text-rose-400 transition-colors"}`}>
@@ -236,8 +258,16 @@ export default function AttendanceTracker() {
         </header>
 
         {activeTab === "track" && <DailyTrack timetable={personalTimetable} attendance={attendance} todayDayName={todayDayName} todayDateString={todayDateString} handleMarkAttendance={handleMarkAttendance} userProfile={userProfile} handleUpdateProfile={async (data) => { await saveProfile(user.uid, data); setUserProfile(data); }} />}
-        
-        {activeTab === "analytics" && <Analytics attendance={attendance} availableSubjects={availableSubjects} todayDateString={todayDateString} />}
+
+        {activeTab === "analytics" && (
+          <Analytics
+            attendance={attendance}
+            availableSubjects={availableSubjects}
+            todayDateString={todayDateString}
+            userProfile={userProfile}
+            handleManualAdjustment={handleManualAdjustment}
+          />
+        )}
 
         {activeTab === "schedule" && (
           <SchedulePanel

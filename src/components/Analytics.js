@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-export default function Analytics({ attendance, availableSubjects, todayDateString }) {
+export default function Analytics({ attendance, availableSubjects, todayDateString, userProfile, handleManualAdjustment }) {
   const [analyticsFilter, setAnalyticsFilter] = useState("till-date");
   const [filterMonth, setFilterMonth] = useState(new Date().toISOString().substring(0, 7));
   const [subjectScope, setSubjectScope] = useState("overall");
@@ -9,6 +9,14 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
     let totalAttended = 0, totalValid = 0;
     const subjectStats = {};
     const sortedDates = Object.keys(attendance).sort();
+    
+    const manualAdjustments = userProfile?.manualAdjustments || {};
+
+    availableSubjects.forEach(sub => {
+      if (subjectScope === "overall" || subjectScope === sub) {
+        subjectStats[sub] = { attended: 0, total: 0 };
+      }
+    });
 
     sortedDates.forEach((date) => {
       const day = attendance[date];
@@ -19,19 +27,32 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
       if (filteredRecords.length === 0) return;
 
       filteredRecords.forEach((record) => {
-        // EXCLUSION FILTER: Completely ignore any Library records in calculations
-        if (record.subject.toUpperCase().includes("LIB")) {
-          return;
-        }
+        if (record.subject.toUpperCase().includes("LIB")) return;
 
         if (record.status !== "Cancelled") {
-          totalValid++;
-          if (record.status === "Attended") totalAttended++;
           if (!subjectStats[record.subject]) subjectStats[record.subject] = { attended: 0, total: 0 };
           subjectStats[record.subject].total++;
           if (record.status === "Attended") subjectStats[record.subject].attended++;
         }
       });
+    });
+
+    // SMART MERGE: Combine auto-tracked and manual, but floor the final results at 0
+    Object.keys(subjectStats).forEach(sub => {
+      const autoPresent = subjectStats[sub].attended;
+      const autoAbsent = subjectStats[sub].total - autoPresent;
+      
+      const manual = manualAdjustments[sub] || { present: 0, absent: 0 };
+      
+      // Calculate final numbers and prevent them from dropping below zero
+      const finalPresent = Math.max(0, autoPresent + (manual.present || 0));
+      const finalAbsent = Math.max(0, autoAbsent + (manual.absent || 0));
+      
+      subjectStats[sub].attended = finalPresent;
+      subjectStats[sub].total = finalPresent + finalAbsent;
+
+      totalAttended += finalPresent;
+      totalValid += (finalPresent + finalAbsent);
     });
 
     const overallPercentage = totalValid > 0 ? Math.round((totalAttended / totalValid) * 100) : 0;
@@ -87,14 +108,42 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
 
       <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6">
         <h3 className="text-lg font-bold text-slate-200 mb-6">Subject Breakdown</h3>
-        <div className="space-y-5">
+        <div className="space-y-4">
           {Object.keys(stats.subjectStats).length > 0 ? (
             Object.entries(stats.subjectStats).map(([sub, data]) => {
-              const percentage = Math.round((data.attended / data.total) * 100);
+              const percentage = data.total > 0 ? Math.round((data.attended / data.total) * 100) : 0;
+              const manual = userProfile?.manualAdjustments?.[sub] || { present: 0, absent: 0 };
+              
               return (
-                <div key={sub}>
+                <div key={sub} className="bg-slate-900/20 p-4 rounded-xl border border-slate-800/50">
                   <div className="flex justify-between text-sm mb-2"><span className="font-semibold text-slate-300">{sub}</span><span className="text-slate-400 font-mono">{percentage}% ({data.attended}/{data.total})</span></div>
-                  <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden"><div className={`h-full rounded-full ${percentage >= 75 ? "bg-indigo-500" : "bg-rose-500"}`} style={{ width: `${percentage}%` }}/></div>
+                  <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden mb-4"><div className={`h-full rounded-full ${percentage >= 75 ? "bg-indigo-500" : "bg-rose-500"}`} style={{ width: `${percentage}%` }}/></div>
+                  
+                  <div className="flex justify-between items-center border-t border-slate-800/50 pt-3">
+                    <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Manual Overrides</span>
+                    <div className="flex gap-3">
+                      
+                      <div className="flex items-center bg-slate-950 border border-slate-700 rounded p-1">
+                        <span className="text-[10px] text-indigo-400 font-bold px-1.5">P:</span>
+                        <button onClick={() => handleManualAdjustment(sub, 'present', 'subtract')} className="px-2 text-slate-400 hover:text-white">-</button>
+                        
+                        {/* Displaying the manual offset (e.g. -1, 0, or 2) */}
+                        <span className="text-[11px] w-5 text-center font-bold text-slate-200">{manual.present || 0}</span>
+                        
+                        <button onClick={() => handleManualAdjustment(sub, 'present', 'add')} className="px-2 text-slate-400 hover:text-white">+</button>
+                      </div>
+                      
+                      <div className="flex items-center bg-slate-950 border border-slate-700 rounded p-1">
+                        <span className="text-[10px] text-rose-400 font-bold px-1.5">A:</span>
+                        <button onClick={() => handleManualAdjustment(sub, 'absent', 'subtract')} className="px-2 text-slate-400 hover:text-white">-</button>
+                        
+                        <span className="text-[11px] w-5 text-center font-bold text-slate-200">{manual.absent || 0}</span>
+                        
+                        <button onClick={() => handleManualAdjustment(sub, 'absent', 'add')} className="px-2 text-slate-400 hover:text-white">+</button>
+                      </div>
+
+                    </div>
+                  </div>
                 </div>
               );
             })
