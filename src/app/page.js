@@ -52,6 +52,8 @@ export default function AttendanceTracker() {
 
   const [activeTab, setActiveTab] = useState("track");
   const [masterTimetable, setMasterTimetable] = useState({ Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [] });
+  // NEW: Store the user's personal profile timetable separately
+  const [myTimetableRaw, setMyTimetableRaw] = useState({ Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [] });
   const [attendance, setAttendance] = useState({});
 
   const [targetYear, setTargetYear] = useState("SE");
@@ -87,21 +89,35 @@ export default function AttendanceTracker() {
     return filtered;
   };
 
-  const personalTimetable = filterTimetable(masterTimetable, userProfile?.group);
+  // UPDATED: Now filters the raw personal data instead of the admin target data
+  const personalTimetable = filterTimetable(myTimetableRaw, userProfile?.group);
 
   // Live Timetable Connection
   useEffect(() => {
     if (!userProfile) return;
 
-    const timetableId = isAdmin
-      ? getTimetableId(targetYear, targetBranch, targetBatch)
-      : getTimetableId(userProfile.year, userProfile.branch, userProfile.batch);
-
-    const unsubscribe = onSnapshot(doc(db, "timetables", timetableId), (docSnap) => {
-      if (docSnap.exists()) setMasterTimetable(docSnap.data());
-      else setMasterTimetable({ Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [] });
+    // 1. ALWAYS download the user's OWN profile timetable for their Daily Track
+    const myTimetableId = getTimetableId(userProfile.year, userProfile.branch, userProfile.batch);
+    const unsubPersonal = onSnapshot(doc(db, "timetables", myTimetableId), (docSnap) => {
+      if (docSnap.exists()) setMyTimetableRaw(docSnap.data());
+      else setMyTimetableRaw({ Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [] });
     });
-    return () => unsubscribe();
+
+    // 2. If they are an Admin, ALSO download the Target timetable for their Admin Panel
+    let unsubAdmin = () => {};
+    if (isAdmin) {
+      const targetTimetableId = getTimetableId(targetYear, targetBranch, targetBatch);
+      unsubAdmin = onSnapshot(doc(db, "timetables", targetTimetableId), (docSnap) => {
+        if (docSnap.exists()) setMasterTimetable(docSnap.data());
+        else setMasterTimetable({ Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [] });
+      });
+    }
+
+    // Cleanup both listeners when leaving
+    return () => {
+      unsubPersonal();
+      unsubAdmin();
+    };
   }, [userProfile, isAdmin, targetYear, targetBranch, targetBatch]);
 
   useEffect(() => {
