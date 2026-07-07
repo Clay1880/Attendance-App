@@ -104,7 +104,7 @@ export default function AttendanceTracker() {
     });
 
     // 2. If they are an Admin, ALSO download the Target timetable for their Admin Panel
-    let unsubAdmin = () => {};
+    let unsubAdmin = () => { };
     if (isAdmin) {
       const targetTimetableId = getTimetableId(targetYear, targetBranch, targetBatch);
       unsubAdmin = onSnapshot(doc(db, "timetables", targetTimetableId), (docSnap) => {
@@ -174,13 +174,16 @@ export default function AttendanceTracker() {
     finally { setIsUploading(false); }
   };
 
-  const handleMarkAttendance = async (subjectName, status) => {
+  const handleMarkAttendance = async (subjectName, timeStr, status) => {
     if (!user) return;
     const dayData = attendance[todayDateString] || { month: todayDateString.substring(0, 7), records: [] };
-    const rIndex = dayData.records.findIndex(r => r.subject === subjectName);
+
+    // SMART FIX: Now we find the specific class by BOTH name and time
+    const rIndex = dayData.records.findIndex(r => r.subject === subjectName && r.time === timeStr);
+
     const updatedRecords = [...dayData.records];
     if (rIndex > -1) updatedRecords[rIndex].status = status;
-    else updatedRecords.push({ subject: subjectName, status });
+    else updatedRecords.push({ subject: subjectName, time: timeStr, status });
 
     const newDayData = { ...dayData, records: updatedRecords };
     setAttendance(prev => ({ ...prev, [todayDateString]: newDayData }));

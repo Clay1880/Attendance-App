@@ -39,7 +39,14 @@ export default function DailyTrack({
             {todaysClasses.map((subject, idx) => {
               // Extract short code just in case old data exists
               const subjectCode = subject.name.split(" ")[0]; 
-              const currentStatus = attendance[todayDateString]?.records.find(r => r.subject === subjectCode)?.status;
+              
+              // 1. UPDATED: Determine the exact time string being used by this lecture
+              const timeString = subject.startTime || subject.time;
+
+              // 2. UPDATED: Check existing attendance using BOTH subject code AND time
+              const currentStatus = attendance[todayDateString]?.records.find(
+                r => r.subject === subjectCode && r.time === timeString
+              )?.status;
               
               return (
                 <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-slate-900/60 border border-slate-800 rounded-xl gap-4 hover:border-slate-700">
@@ -47,13 +54,30 @@ export default function DailyTrack({
                     <h3 className="font-semibold text-slate-200 text-lg">{subjectCode}</h3>
                     {/* DISPLAY BOTH START AND END TIME */}
                     <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-400 inline-block mt-1">
-                      {subject.startTime || subject.time} {subject.endTime ? `→ ${subject.endTime}` : ""}
+                      {timeString} {subject.endTime ? `→ ${subject.endTime}` : ""}
                     </span>
                   </div>
+                  
+                  {/* 3. UPDATED: All buttons now pass the timeString to handleMarkAttendance */}
                   <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <button onClick={() => handleMarkAttendance(subjectCode, "Attended")} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${currentStatus === "Attended" ? "bg-emerald-500/20 border-emerald-500 text-emerald-400" : "bg-slate-900 border-slate-800 text-slate-400"}`}>Attended</button>
-                    <button onClick={() => handleMarkAttendance(subjectCode, "Missed")} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${currentStatus === "Missed" ? "bg-rose-500/20 border-rose-500 text-rose-400" : "bg-slate-900 border-slate-800 text-slate-400"}`}>Missed</button>
-                    <button onClick={() => handleMarkAttendance(subjectCode, "Cancelled")} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${currentStatus === "Cancelled" ? "bg-amber-500/20 border-amber-500 text-amber-400" : "bg-slate-900 border-slate-800 text-slate-400"}`}>N/A</button>
+                    <button 
+                      onClick={() => handleMarkAttendance(subjectCode, timeString, "Attended")} 
+                      className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${currentStatus === "Attended" ? "bg-emerald-500/20 border-emerald-500 text-emerald-400" : "bg-slate-900 border-slate-800 text-slate-400"}`}
+                    >
+                      Attended
+                    </button>
+                    <button 
+                      onClick={() => handleMarkAttendance(subjectCode, timeString, "Missed")} 
+                      className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${currentStatus === "Missed" ? "bg-rose-500/20 border-rose-500 text-rose-400" : "bg-slate-900 border-slate-800 text-slate-400"}`}
+                    >
+                      Missed
+                    </button>
+                    <button 
+                      onClick={() => handleMarkAttendance(subjectCode, timeString, "Cancelled")} 
+                      className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${currentStatus === "Cancelled" ? "bg-amber-500/20 border-amber-500 text-amber-400" : "bg-slate-900 border-slate-800 text-slate-400"}`}
+                    >
+                      N/A
+                    </button>
                   </div>
                 </div>
               );
