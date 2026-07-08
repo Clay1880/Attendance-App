@@ -88,21 +88,21 @@ export default function SuperadminPanel() {
   return (
     <section className="space-y-6 animate-fadeIn">
       
-      {/* Superadmin Sub-Navigation */}
-      <div className="flex gap-2 bg-slate-900/40 p-1.5 border border-slate-800 rounded-xl w-fit">
+      {/* Superadmin Sub-Navigation - FIXED RESPONSIVENESS */}
+      <div className="flex flex-wrap gap-2 bg-slate-900/40 p-1.5 border border-slate-800 rounded-xl w-full sm:w-fit">
         <button 
           onClick={() => setAdminTab("users")} 
-          className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${adminTab === "users" ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-slate-200"}`}
+          className={`flex-auto sm:flex-initial px-4 py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all ${adminTab === "users" ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200"}`}
         >
           User Directory
         </button>
         <button 
           onClick={() => setAdminTab("feedback")} 
-          className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${adminTab === "feedback" ? "bg-rose-600 text-white" : "text-slate-400 hover:text-slate-200"}`}
+          className={`flex-auto sm:flex-initial px-4 py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${adminTab === "feedback" ? "bg-rose-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200"}`}
         >
           Support Tickets
           {feedbackList.filter(f => f.status === "Open").length > 0 && (
-            <span className="ml-2 bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+            <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
               {feedbackList.filter(f => f.status === "Open").length}
             </span>
           )}
@@ -194,12 +194,13 @@ export default function SuperadminPanel() {
               <p className="text-sm text-slate-400">Manage user feedback, bug reports, and timetable mismatches.</p>
             </div>
             
-            <div className="flex bg-slate-950 p-1 border border-slate-800 rounded-xl">
+            {/* Filter Buttons - FIXED RESPONSIVENESS */}
+            <div className="flex flex-wrap gap-1.5 bg-slate-950 p-1.5 border border-slate-800 rounded-xl w-full md:w-auto mt-2 md:mt-0">
               {["All", "Open", "Under Work", "Resolved"].map(f => (
                 <button 
                   key={f} 
                   onClick={() => setTicketFilter(f)}
-                  className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${ticketFilter === f ? "bg-rose-600 text-white" : "text-slate-400 hover:text-slate-200"}`}
+                  className={`flex-auto sm:flex-initial px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${ticketFilter === f ? "bg-rose-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200"}`}
                 >
                   {f}
                 </button>

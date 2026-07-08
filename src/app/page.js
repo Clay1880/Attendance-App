@@ -260,20 +260,32 @@ export default function AttendanceTracker() {
               {isAdmin && <span className="bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-bold px-2 py-1 rounded-md">ADMIN</span>}
             </div>
           </div>
-          <div className="flex flex-col items-end gap-3 w-full md:w-auto">
-            <button onClick={logoutUser} className="text-xs text-rose-400 font-medium">Sign Out</button>
-            <nav className="flex space-x-1 bg-slate-900/80 backdrop-blur-md p-1 border border-slate-800 rounded-xl w-full justify-center">
-              <button onClick={() => setActiveTab("track")} className={`px-4 py-2 text-sm rounded-lg ${activeTab === "track" ? "bg-indigo-600 text-white" : "text-slate-400"}`}>Daily Track</button>
-              <button onClick={() => setActiveTab("analytics")} className={`px-4 py-2 text-sm rounded-lg ${activeTab === "analytics" ? "bg-indigo-600 text-white" : "text-slate-400"}`}>Analytics</button>
-              <button onClick={() => setActiveTab("schedule")} className={`px-4 py-2 text-sm rounded-lg ${activeTab === "schedule" ? "bg-indigo-600 text-white" : "text-slate-400"}`}>{isAdmin ? "Admin Controls" : "My Schedule"}</button>
-              <button onClick={() => setActiveTab("contact")} className={`px-4 py-2 text-sm rounded-lg ${activeTab === "contact" ? "bg-indigo-600 text-white" : "text-slate-400"}`}>Contact</button>
+          <div className="flex flex-col items-end gap-3 w-full md:w-auto mt-4 md:mt-0">
+            <button onClick={logoutUser} className="text-xs text-rose-400 font-medium hover:underline">Sign Out</button>
+            <nav className="flex flex-wrap justify-center gap-1.5 bg-slate-900/80 backdrop-blur-md p-1.5 border border-slate-800 rounded-xl w-full">
 
-              {/* NEW: Secret Tab that only renders for Superadmins */}
+              <button onClick={() => setActiveTab("track")} className={`flex-auto sm:flex-initial px-3 py-2.5 text-xs md:text-sm font-semibold rounded-lg transition-all ${activeTab === "track" ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200"}`}>
+                Daily Track
+              </button>
+
+              <button onClick={() => setActiveTab("analytics")} className={`flex-auto sm:flex-initial px-3 py-2.5 text-xs md:text-sm font-semibold rounded-lg transition-all ${activeTab === "analytics" ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200"}`}>
+                Analytics
+              </button>
+
+              <button onClick={() => setActiveTab("schedule")} className={`flex-auto sm:flex-initial px-3 py-2.5 text-xs md:text-sm font-semibold rounded-lg transition-all ${activeTab === "schedule" ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200"}`}>
+                {isAdmin ? "Admin Controls" : "My Schedule"}
+              </button>
+
+              <button onClick={() => setActiveTab("contact")} className={`flex-auto sm:flex-initial px-3 py-2.5 text-xs md:text-sm font-semibold rounded-lg transition-all ${activeTab === "contact" ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200"}`}>
+                Contact
+              </button>
+
               {isSuperAdmin && (
-                <button onClick={() => setActiveTab("database")} className={`px-4 py-2 text-sm font-bold rounded-lg ${activeTab === "database" ? "bg-rose-600 text-white" : "text-rose-400/70 hover:text-rose-400 transition-colors"}`}>
+                <button onClick={() => setActiveTab("database")} className={`flex-auto sm:flex-initial px-3 py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all ${activeTab === "database" ? "bg-rose-600 text-white shadow-md" : "text-rose-400/70 hover:text-rose-400"}`}>
                   System DB
                 </button>
               )}
+
             </nav>
           </div>
         </header>
