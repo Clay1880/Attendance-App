@@ -27,7 +27,7 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
       if (filteredRecords.length === 0) return;
 
       filteredRecords.forEach((record) => {
-        if (record.subject.toUpperCase().includes("LIB")) return;
+        if (record.subject.toUpperCase().includes("LIB")) return; // Completely ignore Library
 
         if (record.status !== "Cancelled") {
           if (!subjectStats[record.subject]) subjectStats[record.subject] = { attended: 0, total: 0 };
@@ -37,22 +37,36 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
       });
     });
 
-    // SMART MERGE: Combine auto-tracked and manual, but floor the final results at 0
+    // SMART MERGE: Combine auto-tracked and manual
     Object.keys(subjectStats).forEach(sub => {
       const autoPresent = subjectStats[sub].attended;
       const autoAbsent = subjectStats[sub].total - autoPresent;
       
       const manual = manualAdjustments[sub] || { present: 0, absent: 0 };
       
-      // Calculate final numbers and prevent them from dropping below zero
       const finalPresent = Math.max(0, autoPresent + (manual.present || 0));
       const finalAbsent = Math.max(0, autoAbsent + (manual.absent || 0));
       
       subjectStats[sub].attended = finalPresent;
       subjectStats[sub].total = finalPresent + finalAbsent;
 
-      totalAttended += finalPresent;
-      totalValid += (finalPresent + finalAbsent);
+      // --- NEW BULLETPROOF EXCLUSION LOGIC ---
+      const upperSub = sub.toUpperCase().trim();
+      const baseCode = upperSub.split(" ")[0]; // Extracts "DSAL" from "DSAL Lab (B)"
+      
+      // It is a theory subject ONLY IF:
+      // 1. It does not contain "LAB"
+      // 2. It does not contain "TUT"
+      // 3. The base subject code does not strictly end with "L" (e.g., DSAL, CGLL)
+      const isTheory = !upperSub.includes("LAB") && 
+                       !upperSub.includes("TUT") && 
+                       !baseCode.endsWith("L");
+      
+      // Only add to the big totals if it's a Theory subject, OR if the user specifically selected it from the dropdown
+      if (isTheory || subjectScope !== "overall") {
+        totalAttended += finalPresent;
+        totalValid += (finalPresent + finalAbsent);
+      }
     });
 
     const overallPercentage = totalValid > 0 ? Math.round((totalAttended / totalValid) * 100) : 0;
@@ -92,13 +106,15 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-        <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl">
-          <span className="text-xs text-slate-400 block uppercase">Ratio</span>
+        <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl relative">
+          <span className="text-xs text-slate-400 block uppercase">Theory Ratio</span>
           <span className="text-4xl font-extrabold text-indigo-400 mt-2 block">{stats.overallPercentage}%</span>
+          {subjectScope === "overall" && <span className="absolute bottom-4 right-4 text-[9px] text-slate-500 italic">*Excludes Labs/Tuts</span>}
         </div>
-        <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl">
+        <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl relative">
           <span className="text-xs text-slate-400 block uppercase">Lectures Counted</span>
           <div className="mt-2 text-slate-200"><span className="text-4xl font-extrabold text-emerald-400">{stats.totalAttended}</span> <span className="text-slate-500">/ {stats.totalValid}</span></div>
+          {subjectScope === "overall" && <span className="absolute bottom-4 right-4 text-[9px] text-slate-500 italic">*Theory Only</span>}
         </div>
         <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl">
           <span className="text-xs text-slate-400 block uppercase">Target</span>
@@ -126,19 +142,14 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
                       <div className="flex items-center bg-slate-950 border border-slate-700 rounded p-1">
                         <span className="text-[10px] text-indigo-400 font-bold px-1.5">P:</span>
                         <button onClick={() => handleManualAdjustment(sub, 'present', 'subtract')} className="px-2 text-slate-400 hover:text-white">-</button>
-                        
-                        {/* Displaying the manual offset (e.g. -1, 0, or 2) */}
                         <span className="text-[11px] w-5 text-center font-bold text-slate-200">{manual.present || 0}</span>
-                        
                         <button onClick={() => handleManualAdjustment(sub, 'present', 'add')} className="px-2 text-slate-400 hover:text-white">+</button>
                       </div>
                       
                       <div className="flex items-center bg-slate-950 border border-slate-700 rounded p-1">
                         <span className="text-[10px] text-rose-400 font-bold px-1.5">A:</span>
                         <button onClick={() => handleManualAdjustment(sub, 'absent', 'subtract')} className="px-2 text-slate-400 hover:text-white">-</button>
-                        
                         <span className="text-[11px] w-5 text-center font-bold text-slate-200">{manual.absent || 0}</span>
-                        
                         <button onClick={() => handleManualAdjustment(sub, 'absent', 'add')} className="px-2 text-slate-400 hover:text-white">+</button>
                       </div>
 

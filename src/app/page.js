@@ -12,6 +12,7 @@ import DailyTrack from "../components/DailyTrack";
 import Analytics from "../components/Analytics";
 import SchedulePanel from "../components/SchedulePanel";
 import SuperadminPanel from "../components/SuperadminPanel";
+import ContactPanel from "../components/ContactPanel";
 
 export default function AttendanceTracker() {
   const [user, setUser] = useState(null);
@@ -265,6 +266,7 @@ export default function AttendanceTracker() {
               <button onClick={() => setActiveTab("track")} className={`px-4 py-2 text-sm rounded-lg ${activeTab === "track" ? "bg-indigo-600 text-white" : "text-slate-400"}`}>Daily Track</button>
               <button onClick={() => setActiveTab("analytics")} className={`px-4 py-2 text-sm rounded-lg ${activeTab === "analytics" ? "bg-indigo-600 text-white" : "text-slate-400"}`}>Analytics</button>
               <button onClick={() => setActiveTab("schedule")} className={`px-4 py-2 text-sm rounded-lg ${activeTab === "schedule" ? "bg-indigo-600 text-white" : "text-slate-400"}`}>{isAdmin ? "Admin Controls" : "My Schedule"}</button>
+              <button onClick={() => setActiveTab("contact")} className={`px-4 py-2 text-sm rounded-lg ${activeTab === "contact" ? "bg-indigo-600 text-white" : "text-slate-400"}`}>Contact</button>
 
               {/* NEW: Secret Tab that only renders for Superadmins */}
               {isSuperAdmin && (
@@ -310,6 +312,10 @@ export default function AttendanceTracker() {
         {/* NEW: System Database component rendered for superadmins */}
         {activeTab === "database" && isSuperAdmin && (
           <SuperadminPanel />
+        )}
+
+        {activeTab === "contact" && (
+          <ContactPanel userProfile={userProfile} />
         )}
 
       </div>
