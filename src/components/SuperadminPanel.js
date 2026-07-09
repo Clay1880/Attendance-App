@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { fetchAllSystemUsers } from "../services/api";
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import toast from "react-hot-toast";
 
@@ -43,11 +43,26 @@ export default function SuperadminPanel() {
     return () => unsubscribe();
   }, []);
 
-  // --- FEEDBACK ACTIONS ---
-  const handleUpdateStatus = async (id, newStatus) => {
+  // --- FEEDBACK ACTIONS (WITH AUTOMATED NOTIFICATIONS) ---
+  const handleUpdateStatus = async (ticket, newStatus) => {
     try {
-      await updateDoc(doc(db, "feedback", id), { status: newStatus });
+      // 1. Update the ticket status
+      await updateDoc(doc(db, "feedback", ticket.id), { status: newStatus });
       toast.success(`Ticket marked as ${newStatus}`);
+
+      // 2. Automatically send a notification if it's being worked on or resolved
+      if (newStatus === "Resolved" || newStatus === "Under Work") {
+        await addDoc(collection(db, "notifications"), {
+          userEmail: ticket.email,
+          title: newStatus === "Resolved" ? "Ticket Resolved ✅" : "Ticket In Progress 🛠️",
+          message: newStatus === "Resolved" 
+            ? `Good news! Your report regarding "${ticket.issueType}" has been successfully resolved.`
+            : `We are currently investigating your report regarding "${ticket.issueType}".`,
+          type: newStatus === "Resolved" ? "success" : "info",
+          read: false,
+          timestamp: serverTimestamp()
+        });
+      }
     } catch (error) {
       console.error(error);
       toast.error("Failed to update status");
@@ -62,6 +77,26 @@ export default function SuperadminPanel() {
     } catch (error) {
       console.error(error);
       toast.error("Failed to delete ticket");
+    }
+  };
+
+  // --- MANUAL ACCOUNT WARNING ACTION ---
+  const handleSendWarning = async (userEmail, userName) => {
+    const reason = window.prompt(`Send an official warning to ${userName} (${userEmail}).\n\nEnter your message (e.g., Spamming feedback, Abuse):`);
+    if (!reason || !reason.trim()) return;
+
+    try {
+      await addDoc(collection(db, "notifications"), {
+        userEmail: userEmail,
+        title: "⚠️ OFFICIAL ADMIN WARNING",
+        message: `Admin Message: ${reason}\n\nPlease be advised that further violations may result in restricted access to AIT Hub.`,
+        type: "error",
+        read: false,
+        timestamp: serverTimestamp()
+      });
+      toast.success("Warning sent to user!");
+    } catch (error) {
+      toast.error("Failed to send warning.");
     }
   };
 
@@ -161,10 +196,16 @@ export default function SuperadminPanel() {
                             {user.year} • {user.branch} • {user.batch}{user.group}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-right">
-                          <span className="text-xs text-emerald-400 font-semibold bg-emerald-400/10 px-2 py-1 rounded-md border border-emerald-400/20">
+                        <td className="px-6 py-4 text-right flex justify-end gap-2 items-center">
+                          <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-400/10 px-2.5 py-1.5 rounded-md border border-emerald-400/20">
                             Active
                           </span>
+                          <button 
+                            onClick={() => handleSendWarning(user.email, user.name)} 
+                            className="text-[10px] text-rose-400 font-semibold bg-rose-400/10 hover:bg-rose-500/20 px-2.5 py-1.5 rounded-md border border-rose-400/20 transition-colors"
+                          >
+                            ⚠️ Warn
+                          </button>
                         </td>
                       </tr>
                     ))
@@ -241,9 +282,10 @@ export default function SuperadminPanel() {
                     </div>
 
                     <div className="flex flex-row md:flex-col justify-end md:justify-start gap-2 border-t md:border-t-0 md:border-l border-slate-800 pt-4 md:pt-0 md:pl-4">
+                      {/* FIXED: Passing the entire 'ticket' object here instead of just the ID */}
                       <select 
                         value={ticket.status || "Open"} 
-                        onChange={(e) => handleUpdateStatus(ticket.id, e.target.value)}
+                        onChange={(e) => handleUpdateStatus(ticket, e.target.value)}
                         className="bg-slate-950 border border-slate-700 rounded-lg text-xs p-2.5 text-slate-200 outline-none focus:border-rose-500 cursor-pointer"
                       >
                         <option value="Open">🔴 Mark as Open</option>

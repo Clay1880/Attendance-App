@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { doc, getDoc, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, collection, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { db, auth } from "../firebase";
 import toast, { Toaster } from "react-hot-toast";
@@ -13,11 +13,13 @@ import Analytics from "../components/Analytics";
 import SchedulePanel from "../components/SchedulePanel";
 import SuperadminPanel from "../components/SuperadminPanel";
 import ContactPanel from "../components/ContactPanel";
+import NotificationsPanel from "../components/NotificationsPanel";
 
 export default function AttendanceTracker() {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
+  const [notifications, setNotifications] = useState([]); // NEW
 
   const ADMIN_ROLES = {};
 
@@ -53,7 +55,7 @@ export default function AttendanceTracker() {
 
   const [activeTab, setActiveTab] = useState("track");
   const [masterTimetable, setMasterTimetable] = useState({ Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [] });
-  // NEW: Store the user's personal profile timetable separately
+  // Store the user's personal profile timetable separately
   const [myTimetableRaw, setMyTimetableRaw] = useState({ Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [] });
   const [attendance, setAttendance] = useState({});
 
@@ -90,7 +92,7 @@ export default function AttendanceTracker() {
     return filtered;
   };
 
-  // UPDATED: Now filters the raw personal data instead of the admin target data
+  // Filters the raw personal data instead of the admin target data
   const personalTimetable = filterTimetable(myTimetableRaw, userProfile?.group);
 
   // Live Timetable Connection
@@ -120,6 +122,26 @@ export default function AttendanceTracker() {
       unsubAdmin();
     };
   }, [userProfile, isAdmin, targetYear, targetBranch, targetBatch]);
+
+  // --- NEW: Live Notifications Connection ---
+  useEffect(() => {
+    if (!userProfile?.email) return;
+
+    // Fetch messages targeted at this user's email
+    const q = query(collection(db, "notifications"), where("userEmail", "==", userProfile.email));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Sort in memory to avoid needing a complex Firebase index setup!
+      data.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+      setNotifications(data);
+    });
+
+    return () => unsubscribe();
+  }, [userProfile]);
+
+  // Calculate unread count for the red dot
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -280,6 +302,12 @@ export default function AttendanceTracker() {
                 Contact
               </button>
 
+              {/* NEW: Inbox Button with Notification Badge */}
+              <button onClick={() => setActiveTab("notifications")} className={`flex-auto sm:flex-initial px-3 py-2.5 text-xs md:text-sm font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${activeTab === "notifications" ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200"}`}>
+                Inbox
+                {unreadCount > 0 && <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{unreadCount}</span>}
+              </button>
+
               {isSuperAdmin && (
                 <button onClick={() => setActiveTab("database")} className={`flex-auto sm:flex-initial px-3 py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all ${activeTab === "database" ? "bg-rose-600 text-white shadow-md" : "text-rose-400/70 hover:text-rose-400"}`}>
                   System DB
@@ -321,13 +349,17 @@ export default function AttendanceTracker() {
           />
         )}
 
-        {/* NEW: System Database component rendered for superadmins */}
-        {activeTab === "database" && isSuperAdmin && (
-          <SuperadminPanel />
-        )}
-
         {activeTab === "contact" && (
           <ContactPanel userProfile={userProfile} />
+        )}
+
+        {/* NEW: Notifications Panel */}
+        {activeTab === "notifications" && (
+          <NotificationsPanel notifications={notifications} />
+        )}
+
+        {activeTab === "database" && isSuperAdmin && (
+          <SuperadminPanel />
         )}
 
       </div>
