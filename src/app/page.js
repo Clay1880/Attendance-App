@@ -19,11 +19,13 @@ export default function AttendanceTracker() {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
-  const [notifications, setNotifications] = useState([]); // NEW
+  const [notifications, setNotifications] = useState([]);
+
+  // NEW: State for Mobile Hamburger Menu
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const ADMIN_ROLES = {};
 
-  // 1. Superadmins (You and anyone else you add)
   const superAdminsRaw = process.env.NEXT_PUBLIC_SUPERADMIN_EMAILS || "";
   superAdminsRaw.split(",").forEach(email => {
     const cleanEmail = email.trim().toLowerCase();
@@ -32,7 +34,6 @@ export default function AttendanceTracker() {
     }
   });
 
-  // 2. Co-Admins (Your friends) - REMOVED allowedYear SO THEY CAN ACCESS ALL YEARS
   const coAdminENTC = process.env.NEXT_PUBLIC_COADMIN_ENTC?.toLowerCase();
   if (coAdminENTC) ADMIN_ROLES[coAdminENTC] = { role: "coadmin", allowedBranch: "ENTC" };
 
@@ -42,7 +43,6 @@ export default function AttendanceTracker() {
   const coAdminARE = process.env.NEXT_PUBLIC_COADMIN_ARE?.toLowerCase();
   if (coAdminARE) ADMIN_ROLES[coAdminARE] = { role: "coadmin", allowedBranch: "ARE" };
 
-  // --- Validate the current user ---
   const currentUserEmail = userProfile?.email?.toLowerCase();
   const adminConfig = currentUserEmail ? ADMIN_ROLES[currentUserEmail] : null;
   const isAdmin = !!adminConfig;
@@ -55,7 +55,6 @@ export default function AttendanceTracker() {
 
   const [activeTab, setActiveTab] = useState("track");
   const [masterTimetable, setMasterTimetable] = useState({ Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [] });
-  // Store the user's personal profile timetable separately
   const [myTimetableRaw, setMyTimetableRaw] = useState({ Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [] });
   const [attendance, setAttendance] = useState({});
 
@@ -67,15 +66,12 @@ export default function AttendanceTracker() {
   const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const todayDayName = daysOfWeek[new Date().getDay()];
 
-  // Auto-set the target branch if the user is a restricted co-admin
   useEffect(() => {
     if (adminConfig && adminConfig.role === "coadmin") {
-      // ONLY set the branch, leave the year alone so they can select it!
       setTargetBranch(adminConfig.allowedBranch);
     }
   }, [adminConfig]);
 
-  // --- UPGRADED SMART FILTER LOGIC ---
   const filterTimetable = (timetableData, userGroup) => {
     if (!userGroup) return timetableData;
     const filtered = {};
@@ -92,21 +88,17 @@ export default function AttendanceTracker() {
     return filtered;
   };
 
-  // Filters the raw personal data instead of the admin target data
   const personalTimetable = filterTimetable(myTimetableRaw, userProfile?.group);
 
-  // Live Timetable Connection
   useEffect(() => {
     if (!userProfile) return;
 
-    // 1. ALWAYS download the user's OWN profile timetable for their Daily Track
     const myTimetableId = getTimetableId(userProfile.year, userProfile.branch, userProfile.batch);
     const unsubPersonal = onSnapshot(doc(db, "timetables", myTimetableId), (docSnap) => {
       if (docSnap.exists()) setMyTimetableRaw(docSnap.data());
       else setMyTimetableRaw({ Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [] });
     });
 
-    // 2. If they are an Admin, ALSO download the Target timetable for their Admin Panel
     let unsubAdmin = () => { };
     if (isAdmin) {
       const targetTimetableId = getTimetableId(targetYear, targetBranch, targetBatch);
@@ -116,31 +108,23 @@ export default function AttendanceTracker() {
       });
     }
 
-    // Cleanup both listeners when leaving
     return () => {
       unsubPersonal();
       unsubAdmin();
     };
   }, [userProfile, isAdmin, targetYear, targetBranch, targetBatch]);
 
-  // --- NEW: Live Notifications Connection ---
   useEffect(() => {
     if (!userProfile?.email) return;
-
-    // Fetch messages targeted at this user's email
     const q = query(collection(db, "notifications"), where("userEmail", "==", userProfile.email));
-    
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Sort in memory to avoid needing a complex Firebase index setup!
       data.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
       setNotifications(data);
     });
-
     return () => unsubscribe();
   }, [userProfile]);
 
-  // Calculate unread count for the red dot
   const unreadCount = notifications.filter(n => !n.read).length;
 
   useEffect(() => {
@@ -200,8 +184,6 @@ export default function AttendanceTracker() {
   const handleMarkAttendance = async (subjectName, timeStr, status) => {
     if (!user) return;
     const dayData = attendance[todayDateString] || { month: todayDateString.substring(0, 7), records: [] };
-
-    // SMART FIX: Now we find the specific class by BOTH name and time
     const rIndex = dayData.records.findIndex(r => r.subject === subjectName && r.time === timeStr);
 
     const updatedRecords = [...dayData.records];
@@ -215,11 +197,8 @@ export default function AttendanceTracker() {
 
   const handleManualAdjustment = async (subject, type, operation) => {
     if (!user || !userProfile) return;
-
     const currentAdjustments = userProfile.manualAdjustments || {};
     const subjectAdj = currentAdjustments[subject] || { present: 0, absent: 0 };
-
-    // ALLOW NEGATIVES: We removed the zero-limit so users can subtract auto-tracked mistakes!
     let newCount = subjectAdj[type] + (operation === 'add' ? 1 : -1);
 
     const updatedProfile = {
@@ -229,10 +208,14 @@ export default function AttendanceTracker() {
         [subject]: { ...subjectAdj, [type]: newCount }
       }
     };
-
     setUserProfile(updatedProfile);
     await saveProfile(user.uid, updatedProfile);
     toast.success(`${subject} manually updated!`);
+  };
+
+  const handleTabSwitch = (tabName) => {
+    setActiveTab(tabName);
+    setIsMobileMenuOpen(false); // Auto-close mobile menu on click
   };
 
   const availableSubjects = Array.from(new Set(Object.values(personalTimetable).flatMap(d => d.map(s => s.name))))
@@ -270,53 +253,94 @@ export default function AttendanceTracker() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 md:p-8 selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500 selection:text-white pb-12">
       <Toaster position="bottom-right" toastOptions={{ style: { background: '#1e293b', color: '#f8fafc', border: '1px solid #334155' } }} />
-      <div className="max-w-4xl mx-auto space-y-8">
 
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-800 pb-6 gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-extrabold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">AIT Hub</h1>
+      {/* ============================== */}
+      {/* NEW STICKY RESPONSIVE NAVBAR */}
+      {/* ============================== */}
+      <nav className="sticky top-0 z-50 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800 px-4 py-3 sm:px-8 sm:py-4">
+        <div className="max-w-6xl mx-auto flex justify-between items-center">
+
+          {/* Logo & Identity */}
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">AIT Hub</h1>
+            <div className="hidden sm:flex items-center gap-2">
               <span className="bg-slate-800 text-slate-300 text-[10px] font-bold px-2 py-1 rounded-md">{userProfile.year} • {userProfile.branch} • {userProfile.batch}{userProfile.group}</span>
               {isAdmin && <span className="bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-bold px-2 py-1 rounded-md">ADMIN</span>}
             </div>
           </div>
-          <div className="flex flex-col items-end gap-3 w-full md:w-auto mt-4 md:mt-0">
-            <button onClick={logoutUser} className="text-xs text-rose-400 font-medium hover:underline">Sign Out</button>
-            <nav className="flex flex-wrap justify-center gap-1.5 bg-slate-900/80 backdrop-blur-md p-1.5 border border-slate-800 rounded-xl w-full">
 
-              <button onClick={() => setActiveTab("track")} className={`flex-auto sm:flex-initial px-3 py-2.5 text-xs md:text-sm font-semibold rounded-lg transition-all ${activeTab === "track" ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200"}`}>
-                Daily Track
-              </button>
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center gap-2">
+            <button onClick={() => handleTabSwitch("track")} className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === "track" ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"}`}>Daily Track</button>
+            <button onClick={() => handleTabSwitch("analytics")} className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === "analytics" ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"}`}>Analytics</button>
+            <button onClick={() => handleTabSwitch("schedule")} className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === "schedule" ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"}`}>{isAdmin ? "Admin Controls" : "My Schedule"}</button>
+            <button onClick={() => handleTabSwitch("contact")} className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === "contact" ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"}`}>Contact</button>
 
-              <button onClick={() => setActiveTab("analytics")} className={`flex-auto sm:flex-initial px-3 py-2.5 text-xs md:text-sm font-semibold rounded-lg transition-all ${activeTab === "analytics" ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200"}`}>
-                Analytics
-              </button>
+            <button onClick={() => handleTabSwitch("notifications")} className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all flex items-center gap-1.5 ${activeTab === "notifications" ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"}`}>
+              Inbox {unreadCount > 0 && <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{unreadCount}</span>}
+            </button>
 
-              <button onClick={() => setActiveTab("schedule")} className={`flex-auto sm:flex-initial px-3 py-2.5 text-xs md:text-sm font-semibold rounded-lg transition-all ${activeTab === "schedule" ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200"}`}>
-                {isAdmin ? "Admin Controls" : "My Schedule"}
-              </button>
+            {isSuperAdmin && (
+              <button onClick={() => handleTabSwitch("database")} className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === "database" ? "bg-rose-600 text-white shadow-md" : "text-rose-400/70 hover:text-rose-400 hover:bg-rose-950/30"}`}>System DB</button>
+            )}
 
-              <button onClick={() => setActiveTab("contact")} className={`flex-auto sm:flex-initial px-3 py-2.5 text-xs md:text-sm font-semibold rounded-lg transition-all ${activeTab === "contact" ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200"}`}>
-                Contact
-              </button>
-
-              {/* NEW: Inbox Button with Notification Badge */}
-              <button onClick={() => setActiveTab("notifications")} className={`flex-auto sm:flex-initial px-3 py-2.5 text-xs md:text-sm font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${activeTab === "notifications" ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200"}`}>
-                Inbox
-                {unreadCount > 0 && <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{unreadCount}</span>}
-              </button>
-
-              {isSuperAdmin && (
-                <button onClick={() => setActiveTab("database")} className={`flex-auto sm:flex-initial px-3 py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all ${activeTab === "database" ? "bg-rose-600 text-white shadow-md" : "text-rose-400/70 hover:text-rose-400"}`}>
-                  System DB
-                </button>
-              )}
-
-            </nav>
+            <div className="w-px h-6 bg-slate-800 mx-2"></div>
+            <button onClick={logoutUser} className="text-sm text-rose-400 font-medium hover:underline">Sign Out</button>
           </div>
-        </header>
+
+          {/* Mobile Hamburger Toggle */}
+          <div className="md:hidden flex items-center gap-4">
+            {/* Quick Unread Indicator on Mobile */}
+            {unreadCount > 0 && <div className="w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse"></div>}
+
+            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-slate-300 hover:text-white p-1">
+              {isMobileMenuOpen ? (
+                // Close Icon (X)
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              ) : (
+                // Menu Icon (Hamburger)
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Dropdown Menu */}
+        {/* Mobile Dropdown Menu */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden mt-4 pt-4 border-t border-slate-800 flex flex-col items-center gap-2 pb-2 animate-fadeIn">
+            {/* Mobile Badges */}
+            <div className="flex items-center justify-center gap-2 mb-3 w-full">
+              <span className="bg-slate-800 text-slate-300 text-[10px] font-bold px-2 py-1 rounded-md">{userProfile.year} • {userProfile.branch} • {userProfile.batch}{userProfile.group}</span>
+              {isAdmin && <span className="bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-bold px-2 py-1 rounded-md">ADMIN</span>}
+            </div>
+
+            <button onClick={() => handleTabSwitch("track")} className={`w-[90%] max-w-[350px] text-center px-4 py-3 rounded-xl font-semibold transition-colors ${activeTab === "track" ? "bg-indigo-600 text-white" : "text-slate-300 bg-slate-900/50"}`}>Daily Track</button>
+            <button onClick={() => handleTabSwitch("analytics")} className={`w-[90%] max-w-[350px] text-center px-4 py-3 rounded-xl font-semibold transition-colors ${activeTab === "analytics" ? "bg-indigo-600 text-white" : "text-slate-300 bg-slate-900/50"}`}>Analytics</button>
+            <button onClick={() => handleTabSwitch("schedule")} className={`w-[90%] max-w-[350px] text-center px-4 py-3 rounded-xl font-semibold transition-colors ${activeTab === "schedule" ? "bg-indigo-600 text-white" : "text-slate-300 bg-slate-900/50"}`}>{isAdmin ? "Admin Controls" : "My Schedule"}</button>
+            <button onClick={() => handleTabSwitch("contact")} className={`w-[90%] max-w-[350px] text-center px-4 py-3 rounded-xl font-semibold transition-colors ${activeTab === "contact" ? "bg-indigo-600 text-white" : "text-slate-300 bg-slate-900/50"}`}>Contact Support</button>
+
+            <button onClick={() => handleTabSwitch("notifications")} className={`w-[90%] max-w-[350px] flex justify-center items-center gap-2 px-4 py-3 rounded-xl font-semibold transition-colors ${activeTab === "notifications" ? "bg-indigo-600 text-white" : "text-slate-300 bg-slate-900/50"}`}>
+              Inbox {unreadCount > 0 && <span className="bg-rose-500 text-white text-xs px-2 py-0.5 rounded-full">{unreadCount} New</span>}
+            </button>
+
+            {isSuperAdmin && (
+              <button onClick={() => handleTabSwitch("database")} className={`w-[90%] max-w-[350px] text-center px-4 py-3 rounded-xl font-bold transition-colors ${activeTab === "database" ? "bg-rose-600 text-white" : "text-rose-400 bg-rose-950/20 border border-rose-900/30"}`}>System DB</button>
+            )}
+
+            <div className="w-full border-t border-slate-800 mt-3 pt-4 flex justify-center">
+              <button onClick={logoutUser} className="w-[90%] max-w-[350px] text-center px-4 py-3 rounded-xl font-bold text-rose-500 border border-rose-500/40 hover:bg-rose-500/10 hover:border-rose-500 transition-colors">
+                Sign Out
+              </button>
+            </div>
+          </div>
+        )}
+      </nav>
+
+      {/* Main Page Content */}
+      <main className="max-w-4xl mx-auto mt-8 px-4 sm:px-8 space-y-8">
 
         {activeTab === "track" && <DailyTrack timetable={personalTimetable} attendance={attendance} todayDayName={todayDayName} todayDateString={todayDateString} handleMarkAttendance={handleMarkAttendance} userProfile={userProfile} handleUpdateProfile={async (data) => { await saveProfile(user.uid, data); setUserProfile(data); }} />}
 
@@ -353,7 +377,6 @@ export default function AttendanceTracker() {
           <ContactPanel userProfile={userProfile} />
         )}
 
-        {/* NEW: Notifications Panel */}
         {activeTab === "notifications" && (
           <NotificationsPanel notifications={notifications} />
         )}
@@ -362,7 +385,7 @@ export default function AttendanceTracker() {
           <SuperadminPanel />
         )}
 
-      </div>
+      </main>
     </div>
   );
 }
