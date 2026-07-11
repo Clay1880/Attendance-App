@@ -32,7 +32,7 @@ export const fetchAllSystemUsers = async () => {
     });
     return usersList;
   } catch (error) {
-    console.error("Error fetching all users:", error);
+    console.error("Error in fetching all users:Try again later", error);
     return [];
   }
 };
