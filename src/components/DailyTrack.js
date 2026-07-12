@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from "react";
 
-// --- NEW: Helper for Dynamic Subgroups ---
 const getGroupOptions = (branch, batch) => {
   if (branch === "ENTC") {
     return batch === "A" ? ["A1", "A2", "A3"] : ["B1", "B2", "B3"];
   }
-  return ["A", "B", "C"]; // Default for CS, IT, etc.
+  return ["A", "B", "C"]; 
 };
 
 export default function DailyTrack({ 
@@ -25,7 +24,17 @@ export default function DailyTrack({
     group: userProfile?.group || "A"
   });
 
-  // --- NEW: Auto-Correct Group Selection when Editing Profile ---
+  const [localOverrides, setLocalOverrides] = useState({});
+  const [editingIndex, setEditingIndex] = useState(null);
+  const [customSubjectName, setCustomSubjectName] = useState("");
+
+  useEffect(() => {
+    const savedOverrides = localStorage.getItem(`ait_overrides_${todayDateString}`);
+    if (savedOverrides) {
+      setLocalOverrides(JSON.parse(savedOverrides));
+    }
+  }, [todayDateString]);
+
   const currentEditGroups = getGroupOptions(editForm.branch, editForm.batch);
   
   useEffect(() => {
@@ -39,6 +48,18 @@ export default function DailyTrack({
     setIsEditing(false);
   };
 
+  const handleSaveLocalOverride = (idx, fallbackName) => {
+    if (!customSubjectName.trim()) return setEditingIndex(null);
+    
+    const updated = {
+      ...localOverrides,
+      [idx]: customSubjectName.trim()
+    };
+    setLocalOverrides(updated);
+    localStorage.setItem(`ait_overrides_${todayDateString}`, JSON.stringify(updated));
+    setEditingIndex(null);
+  };
+
   const todaysClassesRaw = timetable[todayDayName] || [];
   const todaysClasses = todaysClassesRaw.filter(subject => !subject.name.toUpperCase().includes("LIB"));
 
@@ -48,22 +69,73 @@ export default function DailyTrack({
       {/* LEFT SIDE: Today's Lectures */}
       <div className="md:col-span-2 bg-slate-900/40 border border-slate-800 border-t-slate-700/50 backdrop-blur-xl rounded-2xl p-6 h-fit shadow-xl shadow-black/40">
         <h2 className="text-xl font-bold mb-2 text-slate-200">Today's Lectures</h2>
-        <p className="text-sm text-slate-400 mb-6">Mark classes scheduled for today.</p>
+        <p className="text-sm text-slate-400 mb-6">Mark classes scheduled for today. Use the pencil icon to modify text locally.</p>
         
         {todaysClasses.length > 0 ? (
           <div className="grid gap-4">
             {todaysClasses.map((subject, idx) => {
-              const subjectCode = subject.name.split(" ")[0]; 
               const timeString = subject.startTime || subject.time;
+              
+              // --- SMART BATCH FORMATTING ---
+              // If the class has brackets like (A) or (A1) and isn't already labeled as a Lab/Tut, append "Lab"
+              let autoFormattedName = subject.name;
+              const upperName = autoFormattedName.toUpperCase();
+              if (upperName.includes("(") && !upperName.includes("LAB") && !upperName.includes("TUT")) {
+                autoFormattedName = autoFormattedName.replace(/\s*\(/, " Lab (");
+              }
+              
+              // Compute display name based on local changes or auto-formatted default
+              const displayName = localOverrides[idx] || autoFormattedName;
+              
+              // We grab the first word for the database key so tracking doesn't break
+              const subjectCode = displayName.split(" ")[0]; 
 
               const currentStatus = attendance[todayDateString]?.records.find(
                 r => r.subject === subjectCode && r.time === timeString
               )?.status;
               
               return (
-                <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-slate-900/60 border border-slate-800 rounded-xl gap-4 hover:border-slate-700 transition-colors duration-200 hover:-translate-y-0.5">
-                  <div>
-                    <h3 className="font-semibold text-slate-200 text-lg">{subject.name}</h3>
+                <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-slate-900/60 border border-slate-800 rounded-xl gap-4 hover:border-slate-700 transition-colors duration-200">
+                  
+                  {/* Subject details & inline local editor */}
+                  <div className="flex-1 w-full">
+                    {editingIndex === idx ? (
+                      <div className="flex items-center gap-2 w-full max-w-[300px] mt-1">
+                        <input
+                          type="text"
+                          value={customSubjectName}
+                          onChange={(e) => setCustomSubjectName(e.target.value)}
+                          className="bg-slate-950 border border-slate-700 rounded-lg text-sm p-1.5 text-slate-200 outline-none w-full focus:border-indigo-500"
+                          placeholder="e.g. CG Lecture"
+                          autoFocus
+                        />
+                        <button 
+                          onClick={() => handleSaveLocalOverride(idx, subject.name)}
+                          className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1.5 rounded-md transition-all active:scale-95"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 group flex-wrap">
+                        <h3 className="font-semibold text-slate-200 text-lg">{displayName}</h3>
+                        
+                        {/* Inline Pencil Toggle Button */}
+                        <button
+                          onClick={() => {
+                            setEditingIndex(idx);
+                            setCustomSubjectName(displayName);
+                          }}
+                          className="p-1 text-slate-500 hover:text-indigo-400 transition-colors opacity-60 group-hover:opacity-100"
+                          title="Change subject for yourself locally"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                    
                     <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-400 inline-block mt-1">
                       {timeString} {subject.endTime ? `→ ${subject.endTime}` : ""}
                     </span>
@@ -84,7 +156,7 @@ export default function DailyTrack({
                     </button>
                     <button 
                       onClick={() => handleMarkAttendance(subjectCode, timeString, "Cancelled")} 
-                      className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all duration-200 active:scale-95 ${currentStatus === "Cancelled" ? "bg-amber-500/20 border-amber-500 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.2)]" : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"}`}
+                      className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all duration-200 active:scale-95 ${currentStatus === "Cancelled" ? "bg-amber-500/20 border-amber-500 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.2)]" : "bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200"}`}
                     >
                       N/A
                     </button>
@@ -131,7 +203,6 @@ export default function DailyTrack({
                 </select>
               </div>
               
-              {/* NEW: Dynamic Group Select for Editing Profile */}
               <div>
                 <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Group</label>
                 <select value={editForm.group} onChange={(e) => setEditForm({...editForm, group: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-slate-200 outline-none">

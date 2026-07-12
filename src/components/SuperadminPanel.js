@@ -5,20 +5,14 @@ import { db } from "../firebase";
 import toast from "react-hot-toast";
 
 export default function SuperadminPanel() {
-  // --- SUB-NAVIGATION STATE ---
-  const [adminTab, setAdminTab] = useState("users"); // "users" or "feedback"
-
-  // --- USER DIRECTORY STATE ---
+  const [adminTab, setAdminTab] = useState("users");
   const [allUsers, setAllUsers] = useState([]);
   const [isUsersLoading, setIsUsersLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-
-  // --- FEEDBACK STATE ---
   const [feedbackList, setFeedbackList] = useState([]);
   const [isFeedbackLoading, setIsFeedbackLoading] = useState(true);
   const [ticketFilter, setTicketFilter] = useState("All");
 
-  // 1. Fetch User Directory Data
   useEffect(() => {
     const loadData = async () => {
       const usersData = await fetchAllSystemUsers();
@@ -28,29 +22,43 @@ export default function SuperadminPanel() {
     loadData();
   }, []);
 
-  // 2. Fetch Feedback Data (Real-time)
   useEffect(() => {
     const q = query(collection(db, "feedback"), orderBy("timestamp", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setFeedbackList(data);
       setIsFeedbackLoading(false);
     });
-
     return () => unsubscribe();
   }, []);
 
-  // --- FEEDBACK ACTIONS (WITH AUTOMATED NOTIFICATIONS) ---
+  // --- CUSTOM ADMIN SCRIPT EXECUTION ---
+  // Use this space to write one-time database scripts (like changing branches, deleting old users, etc.)
+  // Write your code, deploy, click the button in the UI, and then clear the code when done.
+  const handleExecuteAdminScript = async () => {
+    if (!window.confirm("Run custom admin script? Make sure you have verified your code.")) return;
+
+    try {
+      // TODO: Write your bulk Firestore update logic here in the future.
+      // Example: 
+      // for (const user of allUsers) {
+      //    if (user.branch === "IT") await updateDoc(doc(db, "users", user.uid), { someField: true });
+      // }
+      
+      // Default fallback when no code is written:
+      toast("No custom code configured in this function.", { icon: "ℹ️" });
+      
+    } catch (error) {
+      console.error("Script Error:", error);
+      toast.error("Script execution failed. Check console.");
+    }
+  };
+
   const handleUpdateStatus = async (ticket, newStatus) => {
     try {
-      // 1. Update the ticket status
       await updateDoc(doc(db, "feedback", ticket.id), { status: newStatus });
       toast.success(`Ticket marked as ${newStatus}`);
 
-      // 2. Automatically send a notification if it's being worked on or resolved
       if (newStatus === "Resolved" || newStatus === "Under Work") {
         await addDoc(collection(db, "notifications"), {
           userEmail: ticket.email,
@@ -80,9 +88,8 @@ export default function SuperadminPanel() {
     }
   };
 
-  // --- MANUAL ACCOUNT WARNING ACTION ---
   const handleSendWarning = async (userEmail, userName) => {
-    const reason = window.prompt(`Send an official warning to ${userName} (${userEmail}).\n\nEnter your message (e.g., Spamming feedback, Abuse):`);
+    const reason = window.prompt(`Send an official warning to ${userName} (${userEmail}).\n\nEnter your message:`);
     if (!reason || !reason.trim()) return;
 
     try {
@@ -100,7 +107,6 @@ export default function SuperadminPanel() {
     }
   };
 
-  // --- FILTERING LOGIC ---
   const filteredUsers = allUsers.filter(u => 
     (u.name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (u.email?.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -123,33 +129,20 @@ export default function SuperadminPanel() {
   return (
     <section className="space-y-6 animate-fadeIn">
       
-      {/* Superadmin Sub-Navigation - FIXED RESPONSIVENESS */}
       <div className="flex flex-wrap gap-2 bg-slate-900/40 p-1.5 border border-slate-800 rounded-xl w-full sm:w-fit">
-        <button 
-          onClick={() => setAdminTab("users")} 
-          className={`flex-auto sm:flex-initial px-4 py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all ${adminTab === "users" ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200"}`}
-        >
-          User Directory
-        </button>
-        <button 
-          onClick={() => setAdminTab("feedback")} 
-          className={`flex-auto sm:flex-initial px-4 py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${adminTab === "feedback" ? "bg-rose-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200"}`}
-        >
+        <button onClick={() => setAdminTab("users")} className={`flex-auto sm:flex-initial px-4 py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all ${adminTab === "users" ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200"}`}>User Directory</button>
+        <button onClick={() => setAdminTab("feedback")} className={`flex-auto sm:flex-initial px-4 py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${adminTab === "feedback" ? "bg-rose-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200"}`}>
           Support Tickets
           {feedbackList.filter(f => f.status === "Open").length > 0 && (
-            <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
-              {feedbackList.filter(f => f.status === "Open").length}
-            </span>
+            <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{feedbackList.filter(f => f.status === "Open").length}</span>
           )}
         </button>
       </div>
 
-      {/* =========================================
-          VIEW 1: USER DIRECTORY
-      ========================================= */}
       {adminTab === "users" && (
         <div className="space-y-6 animate-fadeIn">
-          {/* Top Stats Row */}
+          
+          {/* Top Stats Row WITH CUSTOM SCRIPT BUTTON */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-slate-900/40 border border-indigo-500/30 p-6 rounded-2xl relative overflow-hidden">
               <div className="absolute -right-6 -top-6 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl"></div>
@@ -158,21 +151,24 @@ export default function SuperadminPanel() {
               <span className="text-xs text-slate-400 ml-2">Students</span>
             </div>
             
-            <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl md:col-span-2 flex items-center">
+            <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl md:col-span-2 flex flex-col justify-center gap-3">
               <div className="w-full">
                 <span className="text-xs text-slate-400 block uppercase font-bold tracking-wider mb-2">Database Search</span>
-                <input 
-                  type="text" 
-                  placeholder="Search by name, email, or branch..." 
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-slate-200 outline-none focus:border-indigo-500 transition-colors"
-                />
+                <input type="text" placeholder="Search by name, email, or branch..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-slate-200 outline-none focus:border-indigo-500 transition-colors" />
+              </div>
+              
+              {/* Custom Admin Script Shell Button */}
+              <div className="flex justify-end">
+                <button 
+                  onClick={handleExecuteAdminScript}
+                  className="text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 px-3 py-1.5 rounded-md font-bold uppercase tracking-wide hover:bg-indigo-500/20 transition-all"
+                >
+                  ⚙️ Run Admin Script
+                </button>
               </div>
             </div>
           </div>
 
-          {/* User Data Table */}
           <div className="bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
@@ -184,37 +180,24 @@ export default function SuperadminPanel() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
-                  {filteredUsers.length > 0 ? (
-                    filteredUsers.map((user, idx) => (
-                      <tr key={user.uid || idx} className="hover:bg-slate-800/30 transition-colors">
-                        <td className="px-6 py-4">
-                          <p className="font-bold text-slate-200">{user.name || "Unknown User"}</p>
-                          <p className="text-xs text-slate-500 font-mono mt-0.5">{user.email}</p>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="inline-block bg-slate-800 text-indigo-300 text-[10px] font-bold px-2.5 py-1 rounded-md">
-                            {user.year} • {user.branch} • {user.batch}{user.group}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right flex justify-end gap-2 items-center">
-                          <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-400/10 px-2.5 py-1.5 rounded-md border border-emerald-400/20">
-                            Active
-                          </span>
-                          <button 
-                            onClick={() => handleSendWarning(user.email, user.name)} 
-                            className="text-[10px] text-rose-400 font-semibold bg-rose-400/10 hover:bg-rose-500/20 px-2.5 py-1.5 rounded-md border border-rose-400/20 transition-colors"
-                          >
-                            ⚠️ Warn
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="3" className="px-6 py-8 text-center text-slate-500 italic">
-                        No users found matching your search.
+                  {filteredUsers.length > 0 ? filteredUsers.map((user, idx) => (
+                    <tr key={user.uid || idx} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="px-6 py-4">
+                        <p className="font-bold text-slate-200">{user.name || "Unknown User"}</p>
+                        <p className="text-xs text-slate-500 font-mono mt-0.5">{user.email}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="inline-block bg-slate-800 text-indigo-300 text-[10px] font-bold px-2.5 py-1 rounded-md">
+                          {user.year} • {user.branch} • {user.batch}{user.group}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right flex justify-end gap-2 items-center">
+                        <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-400/10 px-2.5 py-1.5 rounded-md border border-emerald-400/20">Active</span>
+                        <button onClick={() => handleSendWarning(user.email, user.name)} className="text-[10px] text-rose-400 font-semibold bg-rose-400/10 hover:bg-rose-500/20 px-2.5 py-1.5 rounded-md border border-rose-400/20 transition-colors">⚠️ Warn</button>
                       </td>
                     </tr>
+                  )) : (
+                    <tr><td colSpan="3" className="px-6 py-8 text-center text-slate-500 italic">No users found matching your search.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -223,92 +206,47 @@ export default function SuperadminPanel() {
         </div>
       )}
 
-      {/* =========================================
-          VIEW 2: SUPPORT TICKETS
-      ========================================= */}
       {adminTab === "feedback" && (
         <div className="space-y-6 animate-fadeIn">
-          {/* Header & Filters */}
           <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <h2 className="text-2xl font-bold text-rose-400 mb-1">System Command Center</h2>
               <p className="text-sm text-slate-400">Manage user feedback, bug reports, and timetable mismatches.</p>
             </div>
-            
-            {/* Filter Buttons - FIXED RESPONSIVENESS */}
             <div className="flex flex-wrap gap-1.5 bg-slate-950 p-1.5 border border-slate-800 rounded-xl w-full md:w-auto mt-2 md:mt-0">
               {["All", "Open", "Under Work", "Resolved"].map(f => (
-                <button 
-                  key={f} 
-                  onClick={() => setTicketFilter(f)}
-                  className={`flex-auto sm:flex-initial px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${ticketFilter === f ? "bg-rose-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200"}`}
-                >
-                  {f}
-                </button>
+                <button key={f} onClick={() => setTicketFilter(f)} className={`flex-auto sm:flex-initial px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${ticketFilter === f ? "bg-rose-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200"}`}>{f}</button>
               ))}
             </div>
           </div>
 
-          {/* Feedback Grid */}
           <div className="grid grid-cols-1 gap-4">
-            {filteredFeedback.length > 0 ? (
-              filteredFeedback.map(ticket => (
-                <div key={ticket.id} className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 hover:border-slate-700 transition-colors">
-                  <div className="flex flex-col md:flex-row justify-between gap-4">
-                    
-                    <div className="flex-1 space-y-3">
-                      <div className="flex items-center gap-3">
-                        <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold border uppercase tracking-wider ${getStatusColor(ticket.status || "Open")}`}>
-                          {ticket.status || "Open"}
-                        </span>
-                        <span className="text-xs font-bold text-slate-300 bg-slate-800 px-2 py-1 rounded-md">
-                          {ticket.issueType}
-                        </span>
-                        <span className="text-xs text-slate-500">
-                          {ticket.timestamp?.toDate ? ticket.timestamp.toDate().toLocaleString() : "Just now"}
-                        </span>
-                      </div>
-
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-200">{ticket.name} <span className="text-slate-500 font-normal">({ticket.email})</span></h3>
-                        <p className="text-[11px] font-mono text-indigo-400 mt-0.5">
-                          {ticket.year} • {ticket.branch} • Batch {ticket.batch} • Group {ticket.group}
-                        </p>
-                      </div>
-
-                      <div className="bg-slate-950/50 border border-slate-800/50 p-4 rounded-xl text-sm text-slate-300 whitespace-pre-wrap">
-                        {ticket.message}
-                      </div>
+            {filteredFeedback.length > 0 ? filteredFeedback.map(ticket => (
+              <div key={ticket.id} className="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 hover:border-slate-700 transition-colors">
+                <div className="flex flex-col md:flex-row justify-between gap-4">
+                  <div className="flex-1 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold border uppercase tracking-wider ${getStatusColor(ticket.status || "Open")}`}>{ticket.status || "Open"}</span>
+                      <span className="text-xs font-bold text-slate-300 bg-slate-800 px-2 py-1 rounded-md">{ticket.issueType}</span>
+                      <span className="text-xs text-slate-500">{ticket.timestamp?.toDate ? ticket.timestamp.toDate().toLocaleString() : "Just now"}</span>
                     </div>
-
-                    <div className="flex flex-row md:flex-col justify-end md:justify-start gap-2 border-t md:border-t-0 md:border-l border-slate-800 pt-4 md:pt-0 md:pl-4">
-                      {/* FIXED: Passing the entire 'ticket' object here instead of just the ID */}
-                      <select 
-                        value={ticket.status || "Open"} 
-                        onChange={(e) => handleUpdateStatus(ticket, e.target.value)}
-                        className="bg-slate-950 border border-slate-700 rounded-lg text-xs p-2.5 text-slate-200 outline-none focus:border-rose-500 cursor-pointer"
-                      >
-                        <option value="Open">🔴 Mark as Open</option>
-                        <option value="Under Work">🟡 Mark Under Work</option>
-                        <option value="Resolved">🟢 Mark Resolved</option>
-                      </select>
-                      
-                      <button 
-                        onClick={() => handleDeleteTicket(ticket.id)}
-                        className="bg-slate-950 hover:bg-rose-500/10 border border-slate-800 hover:border-rose-500/30 text-slate-400 hover:text-rose-400 text-xs py-2.5 px-4 rounded-lg font-bold transition-all"
-                      >
-                        Delete Ticket
-                      </button>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-200">{ticket.name} <span className="text-slate-500 font-normal">({ticket.email})</span></h3>
+                      <p className="text-[11px] font-mono text-indigo-400 mt-0.5">{ticket.year} • {ticket.branch} • Batch {ticket.batch} • Group {ticket.group}</p>
                     </div>
-
+                    <div className="bg-slate-950/50 border border-slate-800/50 p-4 rounded-xl text-sm text-slate-300 whitespace-pre-wrap">{ticket.message}</div>
+                  </div>
+                  <div className="flex flex-row md:flex-col justify-end md:justify-start gap-2 border-t md:border-t-0 md:border-l border-slate-800 pt-4 md:pt-0 md:pl-4">
+                    <select value={ticket.status || "Open"} onChange={(e) => handleUpdateStatus(ticket, e.target.value)} className="bg-slate-950 border border-slate-700 rounded-lg text-xs p-2.5 text-slate-200 outline-none focus:border-rose-500 cursor-pointer">
+                      <option value="Open">🔴 Mark as Open</option>
+                      <option value="Under Work">🟡 Mark Under Work</option>
+                      <option value="Resolved">🟢 Mark Resolved</option>
+                    </select>
+                    <button onClick={() => handleDeleteTicket(ticket.id)} className="bg-slate-950 hover:bg-rose-500/10 border border-slate-800 hover:border-rose-500/30 text-slate-400 hover:text-rose-400 text-xs py-2.5 px-4 rounded-lg font-bold transition-all">Delete Ticket</button>
                   </div>
                 </div>
-              ))
-            ) : (
-              <div className="text-center py-16 bg-slate-900/40 border border-dashed border-slate-800 rounded-2xl text-slate-500">
-                No tickets found for this filter. You're all caught up! 🎉
               </div>
-            )}
+            )) : <div className="text-center py-16 bg-slate-900/40 border border-dashed border-slate-800 rounded-2xl text-slate-500">No tickets found for this filter. You're all caught up! 🎉</div>}
           </div>
         </div>
       )}
