@@ -348,7 +348,7 @@ export default function AttendanceTracker() {
             )}
             
             {/* Share to WhatsApp (Bottom Positioned) */}
-            <a 
+            {/* <a 
               href="https://wa.me/?text=Hey!%20Check%20out%20AIT%20Hub%20-%20it%20automatically%20tracks%20our%20attendance%20and%20manages%20our%20timetables.%20https://attendance-app-iota-teal.vercel.app/" 
               target="_blank" 
               rel="noopener noreferrer"
@@ -356,8 +356,8 @@ export default function AttendanceTracker() {
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.591 5.52 0 10.002-4.48 10.002-10.002 0-5.52-4.482-10.002-10.002-10.002-5.521 0-10.002 4.481-10.002 10.002 0 2.158.653 4.148 1.77 5.867l-1.127 4.117 4.166-1.093z" /></svg>
               Share with Classmates
-            </a>
-
+            </a> */}
+  
             <div className="w-full border-t border-slate-800 mt-3 pt-4 flex justify-center">
               <button onClick={logoutUser} className="w-[90%] max-w-[350px] text-center px-4 py-3 rounded-xl font-bold text-rose-500 border border-rose-500/40 hover:bg-rose-500/10 hover:border-rose-500 transition-colors">
                 Sign Out
