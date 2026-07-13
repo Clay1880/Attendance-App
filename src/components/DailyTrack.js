@@ -242,6 +242,25 @@ export default function DailyTrack({
           </div>
         )}
       </div>
+<div className="mt-8 w-full self-stretch md:col-span-3 bg-neutral-950 border border-zinc-800 rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
+  <div className="flex-1">
+    <div className="flex items-center gap-2 mb-2">
+      <span className="font-mono text-[11px] tracking-wider text-cyan-400 uppercase">Referral</span>
+      <div className="h-px flex-1 bg-zinc-800" />
+    </div>
+    <h3 className="text-zinc-50 font-semibold text-base mb-1">Enjoying AIT Hub?</h3>
+    <p className="text-zinc-400 text-sm m-0">Help your classmates stay on top of their attendance too.</p>
+  </div>
+  <a
+    href="https://wa.me/?text=Hey!%20Check%20out%20AIT%20Hub%20-%20it%20automatically%20tracks%20our%20attendance%20and%20manages%20our%20timetables.%20https://attendance-app-iota-teal.vercel.app/"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="w-full sm:w-auto shrink-0 flex items-center justify-center gap-2 bg-transparent hover:bg-cyan-400/10 border border-cyan-400 text-cyan-400 px-5 py-3 rounded-xl font-mono font-semibold text-sm transition-colors active:scale-95 whitespace-nowrap"
+  >
+    <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.591 5.52 0 10.002-4.48 10.002-10.002 0-5.52-4.482-10.002-10.002-10.002-5.521 0-10.002 4.481-10.002 10.002 0 2.158.653 4.148 1.77 5.867l-1.127 4.117 4.166-1.093z" /></svg>
+    Share with classmates
+  </a>
+</div>
 
     </section>
   );
