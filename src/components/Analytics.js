@@ -57,9 +57,11 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
       // It is a theory subject ONLY IF:
       // 1. It does not contain "LAB"
       // 2. It does not contain "TUT"
-      // 3. The base subject code does not strictly end with "L" (e.g., DSAL, CGLL)
+      // 3. It does not contain "COUNSELING" (Excluded from theory calculations)
+      // 4. The base subject code does not strictly end with "L" (e.g., DSAL, CGLL)
       const isTheory = !upperSub.includes("LAB") && 
                        !upperSub.includes("TUT") && 
+                       !upperSub.includes("COUNSELING") &&
                        !baseCode.endsWith("L");
       
       // Only add to the big totals if it's a Theory subject, OR if the user specifically selected it from the dropdown
