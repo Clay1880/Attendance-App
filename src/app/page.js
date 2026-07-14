@@ -22,6 +22,23 @@ const getGroupOptions = (branch, batch) => {
   return ["A", "B", "C"]; // Default for CS, IT, Mechanical, ARE
 };
 
+const mergeContinuousClasses = (dailySchedule) => {
+  if (!dailySchedule || !Array.isArray(dailySchedule)) return [];
+  
+  const mergedSchedule = [];
+  dailySchedule.forEach((currentClass) => {
+    const lastClass = mergedSchedule[mergedSchedule.length - 1];
+
+    if (lastClass && lastClass.name === currentClass.name && lastClass.endTime === currentClass.startTime) {
+      lastClass.endTime = currentClass.endTime; 
+    } else {
+      mergedSchedule.push({ ...currentClass });
+    }
+  });
+
+  return mergedSchedule;
+};
+
 export default function AttendanceTracker() {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
@@ -78,13 +95,16 @@ export default function AttendanceTracker() {
     }
   }, [onboardBranch, onboardBatch, currentOnboardGroups, onboardGroup]);
 
-  // --- UPGRADED: Smarter Subgroup Filtering ---
+  // --- UPGRADED: Smarter Subgroup Filtering & Continuous Class Merging ---
   const filterTimetable = (timetableData, userGroup) => {
-    if (!userGroup) return timetableData;
+    if (!timetableData) return {};
     const filtered = {};
 
     Object.keys(timetableData).forEach((day) => {
-      filtered[day] = timetableData[day].filter((cls) => {
+      // 1. First, filter out the classes that don't belong to this user's group
+      const dailyFiltered = timetableData[day].filter((cls) => {
+        if (!userGroup) return true; // If no group, keep all
+        
         // Find anything inside brackets (e.g., "A1", "A, B")
         const groupMatch = cls.name.match(/[\[\(](.+?)[\]\)]/i);
         
@@ -92,13 +112,12 @@ export default function AttendanceTracker() {
           const tag = groupMatch[1].toUpperCase();
           const uGroup = userGroup.toUpperCase(); // e.g., "A1" or "A"
           
-          // 1. Direct match (If tag is "A1" and user is "A1")
+          // Direct match
           if (tag.includes(uGroup)) return true;
           
-          // 2. Parent match (If tag is "A" and user is "A1")
+          // Parent match (If tag is "A" and user is "A1")
           if (uGroup.length > 1) { 
-            const baseGroup = uGroup.charAt(0); // Extracts "A" from "A1"
-            // Ensure the tag contains "A" but NOT followed by a number (prevents "A2" from matching "A1")
+            const baseGroup = uGroup.charAt(0);
             const baseRegex = new RegExp(`\\b${baseGroup}\\b|\\b${baseGroup}(?![0-9])`);
             if (baseRegex.test(tag)) return true;
           }
@@ -107,7 +126,11 @@ export default function AttendanceTracker() {
         }
         return true; // No brackets = theory class for everyone
       });
+
+      // 2. NOW apply the merge logic to stitch labs together for the UI!
+      filtered[day] = mergeContinuousClasses(dailyFiltered);
     });
+    
     return filtered;
   };
 
@@ -347,17 +370,6 @@ export default function AttendanceTracker() {
               <button onClick={() => handleTabSwitch("database")} className={`w-[90%] max-w-[350px] text-center px-4 py-3 rounded-xl font-bold transition-colors ${activeTab === "database" ? "bg-rose-600 text-white" : "text-rose-400 bg-rose-950/20 border border-rose-900/30"}`}>System DB</button>
             )}
             
-            {/* Share to WhatsApp (Bottom Positioned) */}
-            {/* <a 
-              href="https://wa.me/?text=Hey!%20Check%20out%20AIT%20Hub%20-%20it%20automatically%20tracks%20our%20attendance%20and%20manages%20our%20timetables.%20https://attendance-app-iota-teal.vercel.app/" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="w-[90%] max-w-[350px] flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-bold transition-all active:scale-95 mt-4 mb-2"
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.591 5.52 0 10.002-4.48 10.002-10.002 0-5.52-4.482-10.002-10.002-10.002-5.521 0-10.002 4.481-10.002 10.002 0 2.158.653 4.148 1.77 5.867l-1.127 4.117 4.166-1.093z" /></svg>
-              Share with Classmates
-            </a> */}
-  
             <div className="w-full border-t border-slate-800 mt-3 pt-4 flex justify-center">
               <button onClick={logoutUser} className="w-[90%] max-w-[350px] text-center px-4 py-3 rounded-xl font-bold text-rose-500 border border-rose-500/40 hover:bg-rose-500/10 hover:border-rose-500 transition-colors">
                 Sign Out
