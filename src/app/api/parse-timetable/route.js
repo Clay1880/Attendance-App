@@ -61,6 +61,6 @@ export async function POST(req) {
     return Response.json(jsonSchedule);
   } catch (error) {
     console.error("Gemini Parsing Error:", error);
-    return Response.json({ error: "Failed to process image" }, { status: 500 });
+    return Response.json({ error: "Failed to process the  image" }, { status: 500 });
   }
 }
