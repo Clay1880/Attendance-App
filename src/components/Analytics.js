@@ -52,7 +52,7 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
 
       // --- NEW BULLETPROOF EXCLUSION LOGIC ---
       const upperSub = sub.toUpperCase().trim();
-      const baseCode = upperSub.split(" ")[0]; // Extracts "DSAL" from "DSAL Lab (B)"
+      const baseCode = upperSub.split(" ")[0]; // Extracts "DSAL" from "DSAL Lab(B)"
       
       // It is a theory subject ONLY IF:
       // 1. It does not contain "LAB"
