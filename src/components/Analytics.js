@@ -55,7 +55,7 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
       const baseCode = upperSub.split(" ")[0]; // Extracts "DSAL" from "DSAL Lab(B)"
       
       // It is a theory subject ONLY IF:
-      // 1. It does not contain "LAB"
+      // 1. It does not contain the  "LAB"
       // 2. It does not contain "TUT"
       // 3. It does not contain "COUNSELING" (Excluded from theory calculations)
       // 4. The base subject code does not strictly end with "L" (e.g., DSAL, CGLL)
