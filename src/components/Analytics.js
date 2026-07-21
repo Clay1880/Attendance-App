@@ -27,7 +27,7 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
       if (filteredRecords.length === 0) return;
 
       filteredRecords.forEach((record) => {
-        if (record.subject.toUpperCase().includes("LIB")) return; // Completely ignore Library
+        if (record.subject.toUpperCase().includes("LIB")) return;
 
         if (record.status !== "Cancelled") {
           if (!subjectStats[record.subject]) subjectStats[record.subject] = { attended: 0, total: 0 };
@@ -37,7 +37,6 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
       });
     });
 
-    // SMART MERGE: Combine auto-tracked and manual
     Object.keys(subjectStats).forEach(sub => {
       const autoPresent = subjectStats[sub].attended;
       const autoAbsent = subjectStats[sub].total - autoPresent;
@@ -50,21 +49,13 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
       subjectStats[sub].attended = finalPresent;
       subjectStats[sub].total = finalPresent + finalAbsent;
 
-      // --- NEW BULLETPROOF EXCLUSION LOGIC ---
       const upperSub = sub.toUpperCase().trim();
-      const baseCode = upperSub.split(" ")[0]; // Extracts "DSAL" from "DSAL Lab(B)"
-      
-      // It is a theory subject ONLY IF:
-      // 1. It does not contain the  "LAB"
-      // 2. It does not contain "TUT"
-      // 3. It does not contain "COUNSELING" (Excluded from theory calculations)
-      // 4. The base subject code does not strictly end with "L" (e.g., DSAL, CGLL)
+      const baseCode = upperSub.split(" ")[0]; 
       const isTheory = !upperSub.includes("LAB") && 
                        !upperSub.includes("TUT") && 
                        !upperSub.includes("COUNSELING") &&
                        !baseCode.endsWith("L");
       
-      // Only add to the big totals if it's a Theory subject, OR if the user specifically selected it from the dropdown
       if (isTheory || subjectScope !== "overall") {
         totalAttended += finalPresent;
         totalValid += (finalPresent + finalAbsent);
