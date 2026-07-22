@@ -16,33 +16,44 @@ export async function POST(req) {
 
     // Initialize Gemini
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    
+    // NEW: Force strict JSON generation directly at the model level
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.5-flash",
+      generationConfig: {
+        responseMimeType: "application/json",
+      }
+    });
 
+    // NEW: Upgraded bulletproof prompt
     const prompt = `
-      You are an expert scheduler. Extract the entire master weekly timetable from this image.
-      
-      CRITICAL PARSING RULES:
-      1. DO NOT filter for any specific batch or group. Extract ALL subjects for ALL groups (A, B, C, etc.) from the image.
-      2. SHORT CODES ONLY: You MUST extract ONLY the short, abbreviated subject code (e.g., "DSA", "CG", "LDCO", "DSAL"). Completely IGNORE and REMOVE any long descriptive syllabus text, topics, or full names.
-      3. RETAIN GROUP LETTERS: If a subject is meant for a specific practical batch/group, include the group letter in parentheses at the end of the short subject code (e.g., "DSAL (A)", "CGL (B)").
-      4. REMOVE TEACHER INITIALS: Completely remove any teacher initials enclosed in parentheses.
-      5. EXTRACT BOTH START & END TIMES (CRITICAL): Carefully look at the timetable grid or headers to find both the start time and the end time for every single lecture/lab slot.
-      6. Standardize all times to a 12-hour AM/PM format (e.g., "08:45 AM", "11:00 AM", "01:45 PM").
-      7. IGNORE BLANK CELLS: If a time slot or cell in the grid is physically empty/blank, DO NOT guess, DO NOT assume it is "LIB", and DO NOT add it. Simply skip that time slot entirely.
-      8. STRICT ROW ALIGNMENT (CRITICAL): Read the grid strictly row by row, horizontally. Do NOT let subjects bleed from one day into another. Pay close attention to horizontal grid lines.
-      9. HOLIDAYS: If a row explicitly says "HOLIDAY" (like Thursday), the array for that specific day MUST be completely empty. Do not accidentally pull classes from the day above or below it.
-      
-      Return ONLY a valid JSON object. Do not include markdown formatting or blocks like \`\`\`json.
-      The structure MUST exactly match this format:
+      You are an expert OCR and data extraction AI. Your task is to extract a master weekly college timetable from the provided image and convert it into a pristine JSON object.
+
+      Timetables often contain merged cells, parallel batch practicals, and confusing formatting. Follow these CRITICAL PARSING RULES meticulously:
+
+      1. GRID ORIENTATION & ALIGNMENT: Carefully identify the Days (Monday-Saturday) and the Time Slots. Ensure you do not mix up rows and columns. Read strictly row-by-row.
+      2. PARALLEL CLASSES (CRITICAL): Engineering timetables often have multiple practical batches at the same time (e.g., Batch A in DSA Lab, Batch B in CG Lab). You MUST extract ALL of them. Create a separate JSON object for EACH batch running in that specific time slot.
+      3. MERGED CELLS & DURATIONS: If a class (like a lab) spans multiple time blocks (e.g., a 2-hour lab spanning two columns), calculate the absolute start time and the absolute end time. Output ONE continuous block (e.g., 01:45 PM to 03:45 PM).
+      4. CLEAN SHORT CODES ONLY: Extract ONLY the subject's abbreviated short code (e.g., "DSA", "CG", "LDCO", "DSAL"). 
+      5. STRIP NOISE: Completely REMOVE teacher initials (e.g., "SKS", "(PR)"), room numbers (e.g., "Room 304", "Lab 1"), and syllabus topics.
+      6. RETAIN BATCH/GROUP BRACKETS: If a subject is for a specific group, append it in parentheses (e.g., "DSAL (A)", "CGL (B1)").
+      7. EXACT TIME FORMATTING: Standardize all times strictly to "hh:mm AM/PM" format (e.g., "08:45 AM", "12:00 PM", "01:45 PM").
+      8. IGNORE NON-ACADEMIC SLOTS: Completely ignore cells labeled "LUNCH", "RECESS", "BREAK", "TEA", or blank cells. Do not include them in the JSON.
+      9. HOLIDAYS/BLANK DAYS: If a row explicitly says "HOLIDAY" or is entirely empty, return an empty array for that day: []. Do not guess or pull from adjacent rows.
+
+      OUTPUT FORMAT:
+      Return strictly a valid JSON object. Do NOT include markdown formatting or blocks like \`\`\`json. The output must match this exact schema:
       {
         "Monday": [
           { "name": "DSA", "startTime": "08:45 AM", "endTime": "09:45 AM" },
-          { "name": "Counseling", "startTime": "03:45 PM", "endTime": "04:45 PM" }
+          { "name": "DSAL (A)", "startTime": "09:45 AM", "endTime": "11:45 AM" },
+          { "name": "CGL (B)", "startTime": "09:45 AM", "endTime": "11:45 AM" }
         ],
-        "Thursday": []
+        "Tuesday": [],
+        "Wednesday": []
       }
       Only include standard weekdays (Monday to Saturday). Ignore Sunday.
-`; 
+    `; 
 
     const imagePart = {
       inlineData: {
@@ -54,7 +65,8 @@ export async function POST(req) {
     const result = await model.generateContent([prompt, imagePart]);
     const responseText = result.response.text();
 
-    // Clean up response in case Gemini includes code blocks
+    // The safety net `.replace` remains just in case, but `responseMimeType` 
+    // ensures the responseText is native JSON.
     const cleanedText = responseText.replace(/```json\n?|```/g, '').trim();
     const jsonSchedule = JSON.parse(cleanedText);
 
