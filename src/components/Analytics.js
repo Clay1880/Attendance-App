@@ -4,6 +4,9 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
   const [analyticsFilter, setAnalyticsFilter] = useState("till-date");
   const [filterMonth, setFilterMonth] = useState(new Date().toISOString().substring(0, 7));
   const [subjectScope, setSubjectScope] = useState("overall");
+  
+  // NEW: State to track which subject is currently being edited
+  const [editingSubject, setEditingSubject] = useState(null);
 
   const calculateStats = () => {
     let totalAttended = 0, totalValid = 0;
@@ -27,7 +30,7 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
       if (filteredRecords.length === 0) return;
 
       filteredRecords.forEach((record) => {
-        if (record.subject.toUpperCase().includes("LIB")) return;
+        if (record.subject.toUpperCase().includes("LIB")) return; // Completely ignore Library
 
         if (record.status !== "Cancelled") {
           if (!subjectStats[record.subject]) subjectStats[record.subject] = { attended: 0, total: 0 };
@@ -37,6 +40,7 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
       });
     });
 
+    // SMART MERGE: Combine auto-tracked and manual
     Object.keys(subjectStats).forEach(sub => {
       const autoPresent = subjectStats[sub].attended;
       const autoAbsent = subjectStats[sub].total - autoPresent;
@@ -49,12 +53,19 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
       subjectStats[sub].attended = finalPresent;
       subjectStats[sub].total = finalPresent + finalAbsent;
 
-      const upperSub = sub.toUpperCase().trim();
-      const baseCode = upperSub.split(" ")[0]; 
-      const isTheory = !upperSub.includes("LAB") && 
-                       !upperSub.includes("TUT") && 
-                       !upperSub.includes("COUNSELING") &&
-                       !baseCode.endsWith("L");
+      // --- ULTRA-BULLETPROOF EXCLUSION LOGIC ---
+      const upperSub = sub.toUpperCase().replace(/\s+/g, ' ').trim();
+      
+      const hasExcludedKeywords = upperSub.includes("LAB") || 
+                                  upperSub.includes("TUT") || 
+                                  upperSub.includes("COUNSELING") ||
+                                  upperSub.includes("PR");
+      
+      const endsWithBracket = /\(.*?\)$/.test(upperSub);
+      const baseCode = upperSub.split(" ")[0];
+      const endsWithL = baseCode.endsWith("L") && baseCode.length >= 4;
+      
+      const isTheory = !hasExcludedKeywords && !endsWithBracket && !endsWithL;
       
       if (isTheory || subjectScope !== "overall") {
         totalAttended += finalPresent;
@@ -121,33 +132,53 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
           {Object.keys(stats.subjectStats).length > 0 ? (
             Object.entries(stats.subjectStats).map(([sub, data]) => {
               const percentage = data.total > 0 ? Math.round((data.attended / data.total) * 100) : 0;
-              const manual = userProfile?.manualAdjustments?.[sub] || { present: 0, absent: 0 };
               
               return (
                 <div key={sub} className="bg-slate-900/20 p-4 rounded-xl border border-slate-800/50">
-                  <div className="flex justify-between text-sm mb-2"><span className="font-semibold text-slate-300">{sub}</span><span className="text-slate-400 font-mono">{percentage}% ({data.attended}/{data.total})</span></div>
-                  <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden mb-4"><div className={`h-full rounded-full ${percentage >= 75 ? "bg-indigo-500" : "bg-rose-500"}`} style={{ width: `${percentage}%` }}/></div>
+                  <div className="flex justify-between text-sm mb-2"><span className="font-semibold text-slate-300">{sub}</span><span className="text-slate-400 font-mono">{percentage}%</span></div>
+                  <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden mb-2"><div className={`h-full rounded-full ${percentage >= 75 ? "bg-indigo-500" : "bg-rose-500"}`} style={{ width: `${percentage}%` }}/></div>
                   
-                  <div className="flex justify-between items-center border-t border-slate-800/50 pt-3">
-                    <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Manual Overrides</span>
-                    <div className="flex gap-3">
-                      
-                      <div className="flex items-center bg-slate-950 border border-slate-700 rounded p-1">
-                        <span className="text-[10px] text-indigo-400 font-bold px-1.5">P:</span>
-                        <button onClick={() => handleManualAdjustment(sub, 'present', 'subtract')} className="px-2 text-slate-400 hover:text-white">-</button>
-                        <span className="text-[11px] w-5 text-center font-bold text-slate-200">{manual.present || 0}</span>
-                        <button onClick={() => handleManualAdjustment(sub, 'present', 'add')} className="px-2 text-slate-400 hover:text-white">+</button>
-                      </div>
-                      
-                      <div className="flex items-center bg-slate-950 border border-slate-700 rounded p-1">
-                        <span className="text-[10px] text-rose-400 font-bold px-1.5">A:</span>
-                        <button onClick={() => handleManualAdjustment(sub, 'absent', 'subtract')} className="px-2 text-slate-400 hover:text-white">-</button>
-                        <span className="text-[11px] w-5 text-center font-bold text-slate-200">{manual.absent || 0}</span>
-                        <button onClick={() => handleManualAdjustment(sub, 'absent', 'add')} className="px-2 text-slate-400 hover:text-white">+</button>
-                      </div>
+                  {/* --- NEW UI: Fraction Editor --- */}
+                  <div className="flex justify-between items-center border-t border-slate-800/50 pt-3 mt-3">
+                    <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Attendance Record</span>
+                    
+                    {editingSubject === sub ? (
+                      <div className="flex items-center gap-1 bg-slate-950 border border-slate-700 rounded-lg p-1 animate-fadeIn">
+                        
+                        {/* Numerator (Attended) */}
+                        <div className="flex items-center bg-slate-900 rounded px-1">
+                          <button onClick={() => handleManualAdjustment(sub, 'present', 'subtract')} className="px-1.5 py-1 text-slate-400 hover:text-white">-</button>
+                          <span className="text-xs w-5 text-center font-bold text-indigo-400">{data.attended}</span>
+                          <button onClick={() => handleManualAdjustment(sub, 'present', 'add')} className="px-1.5 py-1 text-slate-400 hover:text-white">+</button>
+                        </div>
+                        
+                        <span className="text-slate-500 font-bold px-1">/</span>
+                        
+                        {/* Denominator (Total) */}
+                        <div className="flex items-center bg-slate-900 rounded px-1">
+                          <button onClick={() => handleManualAdjustment(sub, 'absent', 'subtract')} className="px-1.5 py-1 text-slate-400 hover:text-white">-</button>
+                          <span className="text-xs w-5 text-center font-bold text-slate-200">{data.total}</span>
+                          <button onClick={() => handleManualAdjustment(sub, 'absent', 'add')} className="px-1.5 py-1 text-slate-400 hover:text-white">+</button>
+                        </div>
 
-                    </div>
+                        {/* Save/Close Button */}
+                        <button onClick={() => setEditingSubject(null)} className="ml-1 px-2 py-1 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 rounded text-xs font-bold transition-colors">
+                          Done
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <div className="bg-slate-950 border border-slate-700 rounded-lg px-4 py-1.5 text-sm font-bold text-slate-200 tracking-wide shadow-inner">
+                          <span className="text-indigo-400">{data.attended}</span> <span className="text-slate-500 mx-1">/</span> {data.total}
+                        </div>
+                        <button onClick={() => setEditingSubject(sub)} className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-md transition-colors" title="Edit Record">
+                          {/* Small Pencil Icon */}
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                        </button>
+                      </div>
+                    )}
                   </div>
+
                 </div>
               );
             })
