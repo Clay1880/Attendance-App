@@ -25,14 +25,31 @@ export const getTimetableId = (year, branch, batch) =>
 
 export const fetchAllSystemUsers = async () => {
   try {
+    // 1. Get all the basic user profiles
     const usersSnapshot = await getDocs(collection(db, "users"));
-    const usersList = [];
-    usersSnapshot.forEach((doc) => {
-      usersList.push({ uid: doc.id, ...doc.data() });
+    
+    // 2. Map through them and fetch their attendance data concurrently for speed
+    const userPromises = usersSnapshot.docs.map(async (userDoc) => {
+      const userData = userDoc.data();
+      
+      // 3. Fetch this specific user's attendance data using your existing function
+      // (Assuming you have a fetchAttendanceData function, if not, let me know how you fetch it!)
+      const userAttendance = await fetchAttendanceData(userDoc.id); 
+
+      // 4. Merge them together into one big object
+      return {
+        uid: userDoc.id,
+        ...userData,
+        attendance: userAttendance || {} // Attach it here so the Admin Panel can see it!
+      };
     });
-    return usersList;
+
+    // 5. Wait for all the data to finish downloading, then return it
+    const allUsersWithAttendance = await Promise.all(userPromises);
+    return allUsersWithAttendance;
+
   } catch (error) {
-    console.error("Error in fetching all users:Try again later", error);
+    console.error("Error fetching admin user data:", error);
     return [];
   }
 };

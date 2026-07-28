@@ -32,22 +32,65 @@ export default function SuperadminPanel() {
     return () => unsubscribe();
   }, []);
 
+  // --- DYNAMIC STATUS CALCULATION (TIMEZONE & WEEKEND SAFE) ---
+  const calculateUserStatus = (attendanceObj) => {
+    // 1. Check if they have data at all
+    if (!attendanceObj || Object.keys(attendanceObj).length === 0) {
+      return "Inactive"; // No records = Inactive
+    }
+
+    // 2. Safely get today at strictly local midnight
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let lastAttendedDate = null;
+
+    // 3. Find the most recent date they actually clicked "Attended"
+    Object.keys(attendanceObj).forEach(dateStr => {
+      const dayData = attendanceObj[dateStr];
+      const hasAttended = dayData.records?.some(r => r.status === "Attended");
+
+      if (hasAttended) {
+        // Safely parse "YYYY-MM-DD" to avoid UTC timezone shifts!
+        const [year, month, day] = dateStr.split('-');
+        const recordDate = new Date(year, month - 1, day);
+        recordDate.setHours(0, 0, 0, 0);
+
+        if (!lastAttendedDate || recordDate > lastAttendedDate) {
+          lastAttendedDate = recordDate;
+        }
+      }
+    });
+
+    if (!lastAttendedDate) return "Inactive";
+
+    // 4. Calculate working days missed (skipping weekends)
+    let daysMissed = 0;
+    let currentDate = new Date(lastAttendedDate);
+    
+    // Move forward one day at a time until we reach today
+    currentDate.setDate(currentDate.getDate() + 1);
+    
+    while (currentDate <= today) {
+      const dayOfWeek = currentDate.getDay();
+      // Only count Monday (1) through Friday (5)
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        daysMissed++;
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    // If they missed 2 or more WORKING days, flag as Inactive
+    return daysMissed >= 2 ? "Inactive" : "Active";
+  };
+
   // --- CUSTOM ADMIN SCRIPT EXECUTION ---
-  // Use this space to write one-time database scripts (like changing branches, deleting old users, etc.)
-  // Write your code, deploy, click the button in the UI, and then clear the code when done.
   const handleExecuteAdminScript = async () => {
     if (!window.confirm("Run custom admin script? Make sure you have verified your code.")) return;
 
     try {
       // TODO: Write your bulk Firestore update logic here in the future.
-      // Example: 
-      // for (const user of allUsers) {
-      //    if (user.branch === "IT") await updateDoc(doc(db, "users", user.uid), { someField: true });
-      // }
-      
-      // Default fallback when no code is written:
       toast("No custom code configured in this function.", { icon: "ℹ️" });
-      
     } catch (error) {
       console.error("Script Error:", error);
       toast.error("Script execution failed. Check console.");
@@ -142,7 +185,6 @@ export default function SuperadminPanel() {
       {adminTab === "users" && (
         <div className="space-y-6 animate-fadeIn">
           
-          {/* Top Stats Row WITH CUSTOM SCRIPT BUTTON */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-slate-900/40 border border-indigo-500/30 p-6 rounded-2xl relative overflow-hidden">
               <div className="absolute -right-6 -top-6 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl"></div>
@@ -157,7 +199,6 @@ export default function SuperadminPanel() {
                 <input type="text" placeholder="Search by name, email, or branch..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-slate-200 outline-none focus:border-indigo-500 transition-colors" />
               </div>
               
-              {/* Custom Admin Script Shell Button */}
               <div className="flex justify-end">
                 <button 
                   onClick={handleExecuteAdminScript}
@@ -180,23 +221,35 @@ export default function SuperadminPanel() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
-                  {filteredUsers.length > 0 ? filteredUsers.map((user, idx) => (
-                    <tr key={user.uid || idx} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="px-6 py-4">
-                        <p className="font-bold text-slate-200">{user.name || "Unknown User"}</p>
-                        <p className="text-xs text-slate-500 font-mono mt-0.5">{user.email}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-block bg-slate-800 text-indigo-300 text-[10px] font-bold px-2.5 py-1 rounded-md">
-                          {user.year} • {user.branch} • {user.batch}{user.group}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right flex justify-end gap-2 items-center">
-                        <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-400/10 px-2.5 py-1.5 rounded-md border border-emerald-400/20">Active</span>
-                        <button onClick={() => handleSendWarning(user.email, user.name)} className="text-[10px] text-rose-400 font-semibold bg-rose-400/10 hover:bg-rose-500/20 px-2.5 py-1.5 rounded-md border border-rose-400/20 transition-colors">⚠️ Warn</button>
-                      </td>
-                    </tr>
-                  )) : (
+                  {filteredUsers.length > 0 ? filteredUsers.map((user, idx) => {
+                    
+                    // Trigger the status check for this specific user row
+                    const currentStatus = calculateUserStatus(user.attendanceData || user.attendance);
+                    
+                    return (
+                      <tr key={user.uid || idx} className="hover:bg-slate-800/30 transition-colors">
+                        <td className="px-6 py-4">
+                          <p className="font-bold text-slate-200">{user.name || "Unknown User"}</p>
+                          <p className="text-xs text-slate-500 font-mono mt-0.5">{user.email}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="inline-block bg-slate-800 text-indigo-300 text-[10px] font-bold px-2.5 py-1 rounded-md">
+                            {user.year} • {user.branch} • {user.batch}{user.group}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right flex justify-end gap-2 items-center">
+                          <span className={`text-[10px] font-semibold px-2.5 py-1.5 rounded-md border ${
+                            currentStatus === "Active" 
+                              ? "text-emerald-400 bg-emerald-400/10 border-emerald-400/20" 
+                              : "text-rose-400 bg-rose-400/10 border-rose-400/20"
+                          }`}>
+                            {currentStatus}
+                          </span>
+                          <button onClick={() => handleSendWarning(user.email, user.name)} className="text-[10px] text-rose-400 font-semibold bg-rose-400/10 hover:bg-rose-500/20 px-2.5 py-1.5 rounded-md border border-rose-400/20 transition-colors">⚠️ Warn</button>
+                        </td>
+                      </tr>
+                    );
+                  }) : (
                     <tr><td colSpan="3" className="px-6 py-8 text-center text-slate-500 italic">No users found matching your search.</td></tr>
                   )}
                 </tbody>
