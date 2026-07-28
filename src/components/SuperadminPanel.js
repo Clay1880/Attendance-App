@@ -13,6 +13,10 @@ export default function SuperadminPanel() {
   const [isFeedbackLoading, setIsFeedbackLoading] = useState(true);
   const [ticketFilter, setTicketFilter] = useState("All");
 
+  // --- NEW: Warning Modal State ---
+  const [warningModal, setWarningModal] = useState({ isOpen: false, userEmail: "", userName: "" });
+  const [warningMessage, setWarningMessage] = useState("");
+
   useEffect(() => {
     const loadData = async () => {
       const usersData = await fetchAllSystemUsers();
@@ -32,30 +36,21 @@ export default function SuperadminPanel() {
     return () => unsubscribe();
   }, []);
 
-  // --- DYNAMIC STATUS CALCULATION (TIMEZONE & WEEKEND SAFE) ---
   const calculateUserStatus = (attendanceObj) => {
-    // 1. Check if they have data at all
     if (!attendanceObj || Object.keys(attendanceObj).length === 0) {
-      return "Inactive"; // No records = Inactive
+      return "Inactive";
     }
-
-    // 2. Safely get today at strictly local midnight
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
     let lastAttendedDate = null;
 
-    // 3. Find the most recent date they actually clicked "Attended"
     Object.keys(attendanceObj).forEach(dateStr => {
       const dayData = attendanceObj[dateStr];
       const hasAttended = dayData.records?.some(r => r.status === "Attended");
-
       if (hasAttended) {
-        // Safely parse "YYYY-MM-DD" to avoid UTC timezone shifts!
         const [year, month, day] = dateStr.split('-');
         const recordDate = new Date(year, month - 1, day);
         recordDate.setHours(0, 0, 0, 0);
-
         if (!lastAttendedDate || recordDate > lastAttendedDate) {
           lastAttendedDate = recordDate;
         }
@@ -64,32 +59,23 @@ export default function SuperadminPanel() {
 
     if (!lastAttendedDate) return "Inactive";
 
-    // 4. Calculate working days missed (skipping weekends)
     let daysMissed = 0;
     let currentDate = new Date(lastAttendedDate);
-    
-    // Move forward one day at a time until we reach today
     currentDate.setDate(currentDate.getDate() + 1);
     
     while (currentDate <= today) {
       const dayOfWeek = currentDate.getDay();
-      // Only count Monday (1) through Friday (5)
       if (dayOfWeek !== 0 && dayOfWeek !== 6) {
         daysMissed++;
       }
       currentDate.setDate(currentDate.getDate() + 1);
     }
-
-    // If they missed 2 or more WORKING days, flag as Inactive
     return daysMissed >= 2 ? "Inactive" : "Active";
   };
 
-  // --- CUSTOM ADMIN SCRIPT EXECUTION ---
   const handleExecuteAdminScript = async () => {
     if (!window.confirm("Run custom admin script? Make sure you have verified your code.")) return;
-
     try {
-      // TODO: Write your bulk Firestore update logic here in the future.
       toast("No custom code configured in this function.", { icon: "ℹ️" });
     } catch (error) {
       console.error("Script Error:", error);
@@ -131,20 +117,27 @@ export default function SuperadminPanel() {
     }
   };
 
-  const handleSendWarning = async (userEmail, userName) => {
-    const reason = window.prompt(`Send an official warning to ${userName} (${userEmail}).\n\nEnter your message:`);
-    if (!reason || !reason.trim()) return;
+  // --- NEW: Submit Warning Logic ---
+  const submitWarning = async () => {
+    if (!warningMessage.trim()) {
+      toast.error("Warning message cannot be empty.");
+      return;
+    }
 
     try {
       await addDoc(collection(db, "notifications"), {
-        userEmail: userEmail,
+        userEmail: warningModal.userEmail,
         title: "⚠️ OFFICIAL ADMIN WARNING",
-        message: `Admin Message: ${reason}\n\nPlease be advised that further violations may result in restricted access to AIT Hub.`,
+        message: `Admin Message: ${warningMessage}\n\nPlease be advised that further violations may result in restricted access to AIT Hub.`,
         type: "error",
         read: false,
         timestamp: serverTimestamp()
       });
-      toast.success("Warning sent to user!");
+      toast.success(`Warning sent to ${warningModal.userName}!`);
+      
+      // Close modal and reset
+      setWarningModal({ isOpen: false, userEmail: "", userName: "" });
+      setWarningMessage("");
     } catch (error) {
       toast.error("Failed to send warning.");
     }
@@ -170,7 +163,7 @@ export default function SuperadminPanel() {
   }
 
   return (
-    <section className="space-y-6 animate-fadeIn">
+    <section className="space-y-6 animate-fadeIn relative">
       
       <div className="flex flex-wrap gap-2 bg-slate-900/40 p-1.5 border border-slate-800 rounded-xl w-full sm:w-fit">
         <button onClick={() => setAdminTab("users")} className={`flex-auto sm:flex-initial px-4 py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all ${adminTab === "users" ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200"}`}>User Directory</button>
@@ -184,7 +177,6 @@ export default function SuperadminPanel() {
 
       {adminTab === "users" && (
         <div className="space-y-6 animate-fadeIn">
-          
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-slate-900/40 border border-indigo-500/30 p-6 rounded-2xl relative overflow-hidden">
               <div className="absolute -right-6 -top-6 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl"></div>
@@ -198,12 +190,8 @@ export default function SuperadminPanel() {
                 <span className="text-xs text-slate-400 block uppercase font-bold tracking-wider mb-2">Database Search</span>
                 <input type="text" placeholder="Search by name, email, or branch..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-slate-200 outline-none focus:border-indigo-500 transition-colors" />
               </div>
-              
               <div className="flex justify-end">
-                <button 
-                  onClick={handleExecuteAdminScript}
-                  className="text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 px-3 py-1.5 rounded-md font-bold uppercase tracking-wide hover:bg-indigo-500/20 transition-all"
-                >
+                <button onClick={handleExecuteAdminScript} className="text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 px-3 py-1.5 rounded-md font-bold uppercase tracking-wide hover:bg-indigo-500/20 transition-all">
                   ⚙️ Run Admin Script
                 </button>
               </div>
@@ -222,8 +210,6 @@ export default function SuperadminPanel() {
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
                   {filteredUsers.length > 0 ? filteredUsers.map((user, idx) => {
-                    
-                    // Trigger the status check for this specific user row
                     const currentStatus = calculateUserStatus(user.attendanceData || user.attendance);
                     
                     return (
@@ -245,7 +231,18 @@ export default function SuperadminPanel() {
                           }`}>
                             {currentStatus}
                           </span>
-                          <button onClick={() => handleSendWarning(user.email, user.name)} className="text-[10px] text-rose-400 font-semibold bg-rose-400/10 hover:bg-rose-500/20 px-2.5 py-1.5 rounded-md border border-rose-400/20 transition-colors">⚠️ Warn</button>
+                          
+                          {/* UPDATED WARN BUTTON: Now opens our custom modal! */}
+                          <button 
+                            onClick={() => {
+                              setWarningModal({ isOpen: true, userEmail: user.email, userName: user.name });
+                              setWarningMessage("");
+                            }} 
+                            className="text-[10px] text-rose-400 font-semibold bg-rose-400/10 hover:bg-rose-500/20 px-2.5 py-1.5 rounded-md border border-rose-400/20 transition-colors"
+                          >
+                            ⚠️ Warn
+                          </button>
+
                         </td>
                       </tr>
                     );
@@ -303,6 +300,48 @@ export default function SuperadminPanel() {
           </div>
         </div>
       )}
+
+      {/* --- NEW: THE CUSTOM WARNING MODAL UI --- */}
+      {warningModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-[#09090b] border border-slate-800 rounded-2xl p-6 shadow-2xl max-w-md w-full relative">
+            
+            <h3 className="text-xl font-bold text-rose-500 mb-1 flex items-center gap-2">
+              <span>⚠️</span> Issue Official Warning
+            </h3>
+            <p className="text-sm text-slate-400 mb-5">
+              Warning <span className="font-bold text-slate-200">{warningModal.userName}</span> ({warningModal.userEmail})
+            </p>
+
+            <textarea 
+              value={warningMessage}
+              onChange={(e) => setWarningMessage(e.target.value)}
+              placeholder="Type your warning reason here. (e.g., 'You have missed 3 consecutive days without prior notice.')"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 outline-none focus:border-rose-500 transition-colors h-32 resize-none mb-4"
+              autoFocus
+            />
+
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => {
+                  setWarningModal({ isOpen: false, userEmail: "", userName: "" });
+                  setWarningMessage("");
+                }} 
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={submitWarning} 
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-sm font-bold rounded-lg transition-colors shadow-lg shadow-rose-500/20"
+              >
+                Send Warning
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </section>
   );
 }
