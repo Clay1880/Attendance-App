@@ -251,7 +251,14 @@ export default function AttendanceTracker() {
     setIsMobileMenuOpen(false); 
   };
 
-  const availableSubjects = Array.from(new Set(Object.values(personalTimetable).flatMap(d => d.map(s => s.name))))
+  const availableSubjects = Array.from(new Set(Object.values(personalTimetable).flatMap(d => d.map(s => {
+    let name = s.name;
+    const upper = name.toUpperCase();
+    if (upper.includes("(") && !upper.includes("LAB") && !upper.includes("TUT")) {
+      name = name.replace(/\s*\(/, " Lab (");
+    }
+    return name;
+  }))))
     .filter(n => n !== "" && !n.toUpperCase().includes("LIB"))
     .sort();
 

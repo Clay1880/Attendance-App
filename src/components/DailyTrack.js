@@ -87,11 +87,22 @@ export default function DailyTrack({
               // Compute display name based on local changes or auto-formatted default
               const displayName = localOverrides[idx] || autoFormattedName;
               
-              // We grab the first word for the database key so tracking doesn't break
-              const subjectCode = displayName.split(" ")[0]; 
+              // Build subject key while retaining Lab/Tut indicators
+              let subjectCode = displayName.split(" ")[0]; 
+              const upperDisplay = displayName.toUpperCase();
+              if (upperDisplay.includes("LAB") && !subjectCode.toUpperCase().includes("LAB")) {
+                subjectCode += " Lab";
+              } else if (upperDisplay.includes("TUT") && !subjectCode.toUpperCase().includes("TUT")) {
+                subjectCode += " Tut";
+              } else {
+                const bracketMatch = displayName.match(/[\[\(].+?[\]\)]/);
+                if (bracketMatch && !subjectCode.includes("(")) {
+                  subjectCode += ` ${bracketMatch[0]}`;
+                }
+              }
 
               const currentStatus = attendance[todayDateString]?.records.find(
-                r => r.subject === subjectCode && r.time === timeString
+                r => (r.subject === subjectCode || r.subject === displayName.split(" ")[0] || r.subject === subject.name) && r.time === timeString
               )?.status;
               
               return (

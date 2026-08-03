@@ -23,7 +23,10 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
 
     sortedDates.forEach((date) => {
       const day = attendance[date];
-      if (analyticsFilter === "month" && day.month !== filterMonth) return;
+      if (!day || !day.records) return;
+      
+      const recordMonth = day.month || date.substring(0, 7);
+      if (analyticsFilter === "month" && recordMonth !== filterMonth) return;
       if (analyticsFilter === "till-date" && date > todayDateString) return;
 
       const filteredRecords = day.records.filter(r => subjectScope === "overall" || r.subject === subjectScope);
@@ -59,13 +62,34 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
       const hasExcludedKeywords = upperSub.includes("LAB") || 
                                   upperSub.includes("TUT") || 
                                   upperSub.includes("COUNSELING") ||
-                                  upperSub.includes("PR");
+                                  upperSub.includes("PR") ||
+                                  upperSub.includes("WORKSHOP") ||
+                                  upperSub.includes("PROJECT") ||
+                                  upperSub.includes("SEMINAR");
       
-      const endsWithBracket = /\(.*?\)$/.test(upperSub);
+      const hasGroupBrackets = /[\[\(].+?[\]\)]/.test(upperSub);
       const baseCode = upperSub.split(" ")[0];
-      const endsWithL = baseCode.endsWith("L") && baseCode.length >= 4;
+      const endsWithL = baseCode.endsWith("L") || baseCode.endsWith("-L") || baseCode.endsWith("_L");
+
+      // Check if this subject matches any lab/bracketed subject in availableSubjects using exact word boundaries
+      const matchesAvailableLab = availableSubjects.some(avail => {
+        const upperAvail = avail.toUpperCase();
+        const availBase = upperAvail.split(" ")[0];
+        const isAvailLab = upperAvail.includes("LAB") || upperAvail.includes("TUT") || /[\[\(].+?[\]\)]/.test(upperAvail) || availBase.endsWith("L");
+        
+        if (!isAvailLab) return false;
+        if (availBase === baseCode) return true;
+        
+        // Exact word boundary match so "CGL" does not falsely match "CG"
+        try {
+          const exactWordRegex = new RegExp(`\\b${baseCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+          return exactWordRegex.test(upperAvail);
+        } catch {
+          return false;
+        }
+      });
       
-      const isTheory = !hasExcludedKeywords && !endsWithBracket && !endsWithL;
+      const isTheory = !hasExcludedKeywords && !hasGroupBrackets && !endsWithL && !matchesAvailableLab;
       
       if (isTheory || subjectScope !== "overall") {
         totalAttended += finalPresent;
