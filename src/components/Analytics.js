@@ -5,7 +5,7 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
   const [filterMonth, setFilterMonth] = useState(new Date().toISOString().substring(0, 7));
   const [subjectScope, setSubjectScope] = useState("overall");
   
-  // NEW: State to track which subject is currently being edited by prince
+  // NEW: State to track which subject is currently being edited
   const [editingSubject, setEditingSubject] = useState(null);
 
   const calculateStats = () => {
