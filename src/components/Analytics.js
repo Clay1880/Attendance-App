@@ -4,9 +4,9 @@ export default function Analytics({ attendance, availableSubjects, todayDateStri
   const [analyticsFilter, setAnalyticsFilter] = useState("till-date");
   const [filterMonth, setFilterMonth] = useState(new Date().toISOString().substring(0, 7));
   const [subjectScope, setSubjectScope] = useState("overall");
-  
   const [editingSubject, setEditingSubject] = useState(null);
 
+  // calculateStats function
   const calculateStats = () => {
     let totalAttended = 0, totalValid = 0;
     const subjectStats = {};
